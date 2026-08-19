@@ -1,0 +1,1189 @@
+     1→'use client'
+     2→
+     3→import { useEffect, useState, useRef, useCallback } from 'react'
+     4→import { motion, AnimatePresence } from 'framer-motion'
+     5→import {
+     6→  Plus,
+     7→  ArrowLeft,
+     8→  Upload,
+     9→  Image as ImageIcon,
+    10→  Trash2,
+    11→  Pencil,
+    12→  X,
+    13→  ChevronLeft,
+    14→  ChevronRight,
+    15→  ImageIcon as LucideImage,
+    16→  Eye,
+    17→  EyeOff,
+    18→  FolderOpen,
+    19→  Loader2,
+    20→} from 'lucide-react'
+    21→
+    22→import { Button } from '@/components/ui/button'
+    23→import { Card, CardContent, CardFooter } from '@/components/ui/card'
+    24→import {
+    25→  Dialog,
+    26→  DialogContent,
+    27→  DialogHeader,
+    28→  DialogTitle,
+    29→  DialogFooter,
+    30→  DialogDescription,
+    31→} from '@/components/ui/dialog'
+    32→import { Input } from '@/components/ui/input'
+    33→import { Label } from '@/components/ui/label'
+    34→import { Textarea } from '@/components/ui/textarea'
+    35→import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+    36→import { Badge } from '@/components/ui/badge'
+    37→import { Separator } from '@/components/ui/separator'
+    38→import {
+    39→  DropdownMenu,
+    40→  DropdownMenuTrigger,
+    41→  DropdownMenuContent,
+    42→  DropdownMenuItem,
+    43→} from '@/components/ui/dropdown-menu'
+    44→import { useAlbumStore, formatDate, type Album, type Photo } from '@/lib/store'
+    45→
+    46→// ==================== ANIMATION VARIANTS ====================
+    47→
+    48→const pageVariants = {
+    49→  initial: { opacity: 0, x: 20 },
+    50→  animate: { opacity: 1, x: 0, transition: { duration: 0.3, ease: 'easeOut' } },
+    51→  exit: { opacity: 0, x: -20, transition: { duration: 0.2, ease: 'easeIn' } },
+    52→}
+    53→
+    54→const staggerContainer = {
+    55→  animate: {
+    56→    transition: {
+    57→      staggerChildren: 0.06,
+    58→    },
+    59→  },
+    60→}
+    61→
+    62→const cardVariants = {
+    63→  initial: { opacity: 0, y: 20, scale: 0.95 },
+    64→  animate: {
+    65→    opacity: 1,
+    66→    y: 0,
+    67→    scale: 1,
+    68→    transition: { duration: 0.35, ease: 'easeOut' },
+    69→  },
+    70→}
+    71→
+    72→const lightboxOverlayVariants = {
+    73→  hidden: { opacity: 0 },
+    74→  visible: { opacity: 1, transition: { duration: 0.25 } },
+    75→  exit: { opacity: 0, transition: { duration: 0.2 } },
+    76→}
+    77→
+    78→const lightboxImageVariants = {
+    79→  hidden: { opacity: 0, scale: 0.9 },
+    80→  visible: {
+    81→    opacity: 1,
+    82→    scale: 1,
+    83→    transition: { duration: 0.3, ease: 'easeOut' },
+    84→  },
+    85→  exit: {
+    86→    opacity: 0,
+    87→    scale: 0.9,
+    88→    transition: { duration: 0.2 },
+    89→  },
+    90→}
+    91→
+    92→// ==================== MAIN PAGE ====================
+    93→
+    94→export default function Home() {
+    95→  const {
+    96→    view,
+    97→    albums,
+    98→    photos,
+    99→    selectedAlbum,
+   100→    lightbox,
+   101→    loading,
+   102→    uploading,
+   103→    uploadProgress,
+   104→    setView,
+   105→    fetchAlbums,
+   106→    createAlbum,
+   107→    updateAlbum,
+   108→    deleteAlbum,
+   109→    uploadPhotos,
+   110→    deletePhoto,
+   111→    openLightbox,
+   112→    closeLightbox,
+   113→    nextPhoto,
+   114→    prevPhoto,
+   115→  } = useAlbumStore()
+   116→
+   117→  // Dialog states
+   118→  const [createDialogOpen, setCreateDialogOpen] = useState(false)
+   119→  const [editDialogOpen, setEditDialogOpen] = useState(false)
+   120→  const [uploadDialogOpen, setUploadDialogOpen] = useState(false)
+   121→
+   122→  // Form states
+   123→  const [newAlbumName, setNewAlbumName] = useState('')
+   124→  const [newAlbumDesc, setNewAlbumDesc] = useState('')
+   125→  const [editAlbumName, setEditAlbumName] = useState('')
+   126→  const [editAlbumDesc, setEditAlbumDesc] = useState('')
+   127→  const [editingAlbum, setEditingAlbum] = useState<Album | null>(null)
+   128→
+   129→  // Upload states
+   130→  const [uploadMethod, setUploadMethod] = useState<'local' | 'imgbb'>('local')
+   131→  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+   132→  const [previews, setPreviews] = useState<string[]>([])
+   133→  const [imgbbApiKey, setImgbbApiKey] = useState('')
+   134→  const [showApiKey, setShowApiKey] = useState(false)
+   135→  const [isDragOver, setIsDragOver] = useState(false)
+   136→  const fileInputRef = useRef<HTMLInputElement>(null)
+   137→
+   138→  // Load ImgBB API key from localStorage on mount
+   139→  useEffect(() => {
+   140→    const savedKey = localStorage.getItem('imgbb_api_key')
+   141→    if (savedKey) setImgbbApiKey(savedKey)
+   142→  }, [])
+   143→
+   144→  // Fetch albums on mount
+   145→  useEffect(() => {
+   146→    fetchAlbums()
+   147→  }, [fetchAlbums])
+   148→
+   149→  // Keyboard navigation for lightbox
+   150→  useEffect(() => {
+   151→    if (!lightbox.open) return
+   152→    const handleKeyDown = (e: KeyboardEvent) => {
+   153→      if (e.key === 'Escape') closeLightbox()
+   154→      if (e.key === 'ArrowRight') nextPhoto()
+   155→      if (e.key === 'ArrowLeft') prevPhoto()
+   156→    }
+   157→    window.addEventListener('keydown', handleKeyDown)
+   158→    return () => window.removeEventListener('keydown', handleKeyDown)
+   159→  }, [lightbox.open, closeLightbox, nextPhoto, prevPhoto])
+   160→
+   161→  // Prevent body scroll when lightbox is open
+   162→  useEffect(() => {
+   163→    if (lightbox.open) {
+   164→      document.body.style.overflow = 'hidden'
+   165→    } else {
+   166→      document.body.style.overflow = ''
+   167→    }
+   168→    return () => {
+   169→      document.body.style.overflow = ''
+   170→    }
+   171→  }, [lightbox.open])
+   172→
+   173→  // ---- Handlers ----
+   174→
+   175→  const handleCreateAlbum = async () => {
+   176→    if (!newAlbumName.trim()) return
+   177→    const ok = await createAlbum({ name: newAlbumName.trim(), description: newAlbumDesc.trim() || undefined })
+   178→    if (ok) {
+   179→      setNewAlbumName('')
+   180→      setNewAlbumDesc('')
+   181→      setCreateDialogOpen(false)
+   182→    }
+   183→  }
+   184→
+   185→  const handleOpenEditDialog = (album: Album) => {
+   186→    setEditingAlbum(album)
+   187→    setEditAlbumName(album.name)
+   188→    setEditAlbumDesc(album.description || '')
+   189→    setEditDialogOpen(true)
+   190→  }
+   191→
+   192→  const handleEditAlbum = async () => {
+   193→    if (!editingAlbum || !editAlbumName.trim()) return
+   194→    const ok = await updateAlbum(editingAlbum.id, {
+   195→      name: editAlbumName.trim(),
+   196→      description: editAlbumDesc.trim() || undefined,
+   197→    })
+   198→    if (ok) {
+   199→      setEditDialogOpen(false)
+   200→      setEditingAlbum(null)
+   201→    }
+   202→  }
+   203→
+   204→  const handleDeleteAlbum = async (id: string) => {
+   205→    await deleteAlbum(id)
+   206→  }
+   207→
+   208→  const handleSelectFiles = (files: FileList | null) => {
+   209→    if (!files) return
+   210→    const newFiles = Array.from(files).filter((f) => f.type.startsWith('image/'))
+   211→    setSelectedFiles((prev) => [...prev, ...newFiles])
+   212→
+   213→    // Generate previews
+   214→    newFiles.forEach((file) => {
+   215→      const reader = new FileReader()
+   216→      reader.onload = (e) => {
+   217→        setPreviews((prev) => [...prev, e.target?.result as string])
+   218→      }
+   219→      reader.readAsDataURL(file)
+   220→    })
+   221→  }
+   222→
+   223→  const handleRemoveFile = (index: number) => {
+   224→    setSelectedFiles((prev) => prev.filter((_, i) => i !== index))
+   225→    setPreviews((prev) => prev.filter((_, i) => i !== index))
+   226→  }
+   227→
+   228→  const handleClearFiles = () => {
+   229→    setSelectedFiles([])
+   230→    setPreviews([])
+   231→  }
+   232→
+   233→  const handleClearFiles = () => {
+   234→    setSelectedFiles([])
+   235→    setPreviews([])
+   236→  }
+   237→
+   238→  const handleUpload = async () => {
+   239→    if (!selectedAlbum || selectedFiles.length === 0) return
+   240→
+   241→    // Save API key to localStorage if using ImgBB
+   242→    if (uploadMethod === 'imgbb' && imgbbApiKey.trim()) {
+   243→      localStorage.setItem('imgbb_api_key', imgbbApiKey.trim())
+   244→    }
+   245→
+   246→    const ok = await uploadPhotos(
+   247→      selectedAlbum.id,
+   248→      selectedFiles,
+   249→      uploadMethod,
+   250→      uploadMethod === 'imgbb' ? imgbbApiKey.trim() : undefined
+   251→    )
+   252→    if (ok) {
+   253→      setSelectedFiles([])
+   254→      setPreviews([])
+   255→      setUploadDialogOpen(false)
+   256→    }
+   257→  }
+   258→
+   259→  const handleDragOver = useCallback((e: React.DragEvent) => {
+   260→    e.preventDefault()
+   261→    setIsDragOver(true)
+   262→  }, [])
+   263→
+   264→  const handleDragLeave = useCallback((e: React.DragEvent) => {
+   265→    e.preventDefault()
+   266→    setIsDragOver(false)
+   267→  }, [])
+   268→
+   269→  const handleDrop = useCallback((e: React.DragEvent) => {
+   270→    e.preventDefault()
+   271→    setIsDragOver(false)
+   272→    handleSelectFiles(e.dataTransfer.files)
+   273→  }, [])
+   274→
+   275→  // ---- Render ----
+   276→
+   277→  return (
+   278→    <div className="min-h-screen flex flex-col">
+   279→      <main className="flex-1">
+   280→        <AnimatePresence mode="wait">
+   281→          {view === 'albums' ? (
+   282→            <motion.div
+   283→              key="albums"
+   284→              variants={pageVariants}
+   285→              initial="initial"
+   286→              animate="animate"
+   287→              exit="exit"
+   288→              className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"
+   289→            >
+   290→              <AlbumsView
+   291→                albums={albums}
+   292→                loading={loading}
+   293→                onOpenCreateDialog={() => setCreateDialogOpen(true)}
+   294→                onEditAlbum={handleOpenEditDialog}
+   295→                onDeleteAlbum={handleDeleteAlbum}
+   296→                onSelectAlbum={(album) => setView('photos', album.id)}
+   297→              />
+   298→            </motion.div>
+   299→          ) : (
+   300→            <motion.div
+   301→              key="photos"
+   302→              variants={pageVariants}
+   303→              initial="initial"
+   304→              animate="animate"
+   305→              exit="exit"
+   306→              className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"
+   307→            >
+   308→              <PhotosView
+   309→                album={selectedAlbum}
+   310→                photos={photos}
+   311→                loading={loading}
+   312→                onBack={() => setView('albums')}
+   313→                onOpenUploadDialog={() => setUploadDialogOpen(true)}
+   314→                onDeletePhoto={deletePhoto}
+   315→                onOpenLightbox={openLightbox}
+   316→              />
+   317→            </motion.div>
+   318→          )}
+   319→        </AnimatePresence>
+   320→      </main>
+   321→
+   322→      {/* Footer */}
+   323→      <footer className="mt-auto border-t py-6 text-center text-sm text-muted-foreground">
+   324→        <p>&copy; {new Date().getFullYear()} Album Koleksi &mdash; Admin Panel</p>
+   325→      </footer>
+   326→
+   327→      {/* Create Album Dialog */}
+   328→      <CreateAlbumDialog
+   329→        open={createDialogOpen}
+   330→        onOpenChange={setCreateDialogOpen}
+   331→        name={newAlbumName}
+   332→        description={newAlbumDesc}
+   333→        onNameChange={setNewAlbumName}
+   334→        onDescriptionChange={setNewAlbumDesc}
+   335→        onSubmit={handleCreateAlbum}
+   336→      />
+   337→
+   338→      {/* Edit Album Dialog */}
+   339→      <EditAlbumDialog
+   340→        open={editDialogOpen}
+   341→        onOpenChange={setEditDialogOpen}
+   342→        name={editAlbumName}
+   343→        description={editAlbumDesc}
+   344→        onNameChange={setEditAlbumName}
+   345→        onDescriptionChange={setEditAlbumDesc}
+   346→        onSubmit={handleEditAlbum}
+   347→      />
+   348→
+   349→      {/* Upload Photos Dialog */}
+   350→      <UploadPhotosDialog
+   351→        open={uploadDialogOpen}
+   352→        onOpenChange={(open) => {
+   353→          setUploadDialogOpen(open)
+   354→          if (!open) {
+   355→            setSelectedFiles([])
+   356→            setPreviews([])
+   357→          }
+   358→        }}
+   359→        uploadMethod={uploadMethod}
+   360→        onMethodChange={setUploadMethod}
+   361→        selectedFiles={selectedFiles}
+   362→        previews={previews}
+   363→        imgbbApiKey={imgbbApiKey}
+   364→        showApiKey={showApiKey}
+   365→        isDragOver={isDragOver}
+   366→        uploading={uploading}
+   367→        uploadProgress={uploadProgress}
+   368→        fileInputRef={fileInputRef}
+   369→        onApiKeyChange={setImgbbApiKey}
+   370→        onToggleShowApiKey={() => setShowApiKey(!showApiKey)}
+   371→        onDragOver={handleDragOver}
+   372→        onDragLeave={handleDragLeave}
+   373→        onDrop={handleDrop}
+   374→        onSelectFiles={handleSelectFiles}
+   375→        onRemoveFile={handleRemoveFile}
+   376→        onClearFiles={handleClearFiles}
+   377→        onUpload={handleUpload}
+   378→      />
+   379→
+   380→      {/* Photo Lightbox */}
+   381→      <PhotoLightbox
+   382→        lightbox={lightbox}
+   383→        onClose={closeLightbox}
+   384→        onPrev={prevPhoto}
+   385→        onNext={nextPhoto}
+   386→      />
+   387→    </div>
+   388→  )
+   389→}
+   390→
+   391→// ==================== ALBUMS VIEW ====================
+   392→
+   393→interface AlbumsViewProps {
+   394→  albums: Album[]
+   395→  loading: boolean
+   396→  onOpenCreateDialog: () => void
+   397→  onEditAlbum: (album: Album) => void
+   398→  onDeleteAlbum: (id: string) => void
+   399→  onSelectAlbum: (album: Album) => void
+   400→}
+   401→
+   402→function AlbumsView({
+   403→  albums,
+   404→  loading,
+   405→  onOpenCreateDialog,
+   406→  onEditAlbum,
+   407→  onDeleteAlbum,
+   408→  onSelectAlbum,
+   409→}: AlbumsViewProps) {
+   410→  return (
+   411→    <section>
+   412→      {/* Header */}
+   413→      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+   414→        <div>
+   415→          <h1 className="text-3xl font-bold tracking-tight text-foreground">Album Koleksi</h1>
+   416→          <p className="text-muted-foreground mt-1">Kelola koleksi foto Anda dengan mudah</p>
+   417→        </div>
+   418→        <Button onClick={onOpenCreateDialog} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 self-start">
+   419→          <Plus className="h-4 w-4" />
+   420→          Buat Album Baru
+   421→        </Button>
+   422→      </div>
+   423→
+   424→      <Separator className="mb-8" />
+   425→
+   426→      {/* Loading State */}
+   427→      {loading && albums.length === 0 && (
+   428→        <div className="flex items-center justify-center py-20">
+   429→          <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+   430→        </div>
+   431→      )}
+   432→
+   433→      {/* Empty State */}
+   434→      {!loading && albums.length === 0 && (
+   435→        <motion.div
+   436→          initial={{ opacity: 0, y: 20 }}
+   437→          animate={{ opacity: 1, y: 0 }}
+   438→          className="flex flex-col items-center justify-center py-20 text-center"
+   439→        >
+   440→          <div className="rounded-full bg-emerald-50 p-6 mb-4">
+   441→            <FolderOpen className="h-12 w-12 text-emerald-500" />
+   442→          </div>
+   443→          <h3 className="text-lg font-semibold text-foreground">Belum ada album</h3>
+   444→          <p className="text-muted-foreground mt-1 max-w-sm">
+   445→            Mulai dengan membuat album baru untuk mengorganisir koleksi foto Anda.
+   446→          </p>
+   447→          <Button
+   448→            onClick={onOpenCreateDialog}
+   449→            className="mt-6 bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+   450→          >
+   451→            <Plus className="h-4 w-4" />
+   452→            Buat Album Pertama
+   453→          </Button>
+   454→        </motion.div>
+   455→      )}
+   456→
+   457→      {/* Albums Grid */}
+   458→      {!loading && albums.length > 0 && (
+   459→        <motion.div
+   460→          variants={staggerContainer}
+   461→          initial="initial"
+   462→          animate="animate"
+   463→          className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"
+   464→        >
+   465→          {albums.map((album) => (
+   466→            <motion.div key={album.id} variants={cardVariants}>
+   467→              <AlbumCard
+   468→                album={album}
+   469→                onEdit={onEditAlbum}
+   470→                onDelete={onDeleteAlbum}
+   471→                onClick={() => onSelectAlbum(album)}
+   472→              />
+   473→            </motion.div>
+   474→          ))}
+   475→        </motion.div>
+   476→      )}
+   477→    </section>
+   478→  )
+   479→}
+   480→
+   481→// ==================== ALBUM CARD ====================
+   482→
+   483→interface AlbumCardProps {
+   484→  album: Album
+   485→  onEdit: (album: Album) => void
+   486→  onDelete: (id: string) => void
+   487→  onClick: () => void
+   488→}
+   489→
+   490→function AlbumCard({ album, onEdit, onDelete, onClick }: AlbumCardProps) {
+   491→  return (
+   492→    <motion.div whileHover={{ scale: 1.02 }} transition={{ duration: 0.2 }}>
+   493→      <Card
+   494→        className="rounded-xl overflow-hidden cursor-pointer group border border-border/60 shadow-sm hover:shadow-md transition-shadow"
+   495→        onClick={onClick}
+   496→      >
+   497→        {/* Cover Image */}
+   498→        <div className="aspect-[4/3] bg-muted relative overflow-hidden">
+   499→          {album.coverUrl ? (
+   500→            <img
+   501→              src={album.coverUrl}
+   502→              alt={album.name}
+   503→              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+   504→            />
+   505→          ) : (
+   506→            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-50">
+   507→              <LucideImage className="h-10 w-10 text-emerald-300" />
+   508→            </div>
+   509→          )}
+   510→          {/* Photo count badge */}
+   511→          <Badge
+   512→            variant="secondary"
+   513→            className="absolute top-2 right-2 bg-black/60 text-white border-0 text-xs"
+   514→          >
+   515→            {album._count.photos} foto
+   516→          </Badge>
+   517→        </div>
+   518→
+   519→        <CardContent className="p-4">
+   520→          <h3 className="font-semibold text-foreground truncate">{album.name}</h3>
+   521→          {album.description && (
+   522→            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{album.description}</p>
+   523→          )}
+   524→          <p className="text-xs text-muted-foreground mt-2">{formatDate(album.createdAt)}</p>
+   525→        </CardContent>
+   526→
+   527→        <CardFooter className="px-4 pb-4 pt-0 flex justify-end gap-1">
+   528→          <Button
+   529→            variant="ghost"
+   530→            size="sm"
+   531→            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+   532→            onClick={(e) => {
+   533→              e.stopPropagation()
+   534→              onEdit(album)
+   535→            }}
+   536→          >
+   537→            <Pencil className="h-3.5 w-3.5" />
+   538→          </Button>
+   539→          <DropdownMenu>
+   540→            <DropdownMenuTrigger asChild>
+   541→              <Button
+   542→                variant="ghost"
+   543→                size="sm"
+   544→                className="h-8 w-8 p-0 text-muted-foreground hover:text-red-600"
+   545→                onClick={(e) => e.stopPropagation()}
+   546→              >
+   547→                <Trash2 className="h-3.5 w-3.5" />
+   548→              </Button>
+   549→            </DropdownMenuTrigger>
+   550→            <DropdownMenuContent align="end">
+   551→              <DropdownMenuItem
+   552→                className="text-red-600 focus:text-red-600 focus:bg-red-50"
+   553→                onClick={(e) => {
+   554→                  e.stopPropagation()
+   555→                  onDelete(album.id)
+   556→                }}
+   557→              >
+   558→                <Trash2 className="h-4 w-4 mr-2" />
+   559→                Hapus Album
+   560→              </DropdownMenuItem>
+   561→            </DropdownMenuContent>
+   562→          </DropdownMenu>
+   563→        </CardFooter>
+   564→      </Card>
+   565→    </motion.div>
+   566→  )
+   567→}
+   568→
+   569→// ==================== PHOTOS VIEW ====================
+   570→
+   571→interface PhotosViewProps {
+   572→  album: Album | null
+   573→  photos: Photo[]
+   574→  loading: boolean
+   575→  onBack: () => void
+   576→  onOpenUploadDialog: () => void
+   577→  onDeletePhoto: (id: string) => void
+   578→  onOpenLightbox: (photos: Photo[], index: number) => void
+   579→}
+   580→
+   581→function PhotosView({
+   582→  album,
+   583→  photos,
+   584→  loading,
+   585→  onBack,
+   586→  onOpenUploadDialog,
+   587→  onDeletePhoto,
+   588→  onOpenLightbox,
+   589→}: PhotosViewProps) {
+   590→  return (
+   591→    <section>
+   592→      {/* Header */}
+   593→      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+   594→        <div className="flex items-center gap-3">
+   595→          <Button variant="ghost" size="sm" onClick={onBack} className="gap-2 text-muted-foreground">
+   596→            <ArrowLeft className="h-4 w-4" />
+   597→            Kembali
+   598→          </Button>
+   599→          <div>
+   600→            <div className="flex items-center gap-3">
+   601→              <h1 className="text-2xl font-bold tracking-tight text-foreground">{album?.name}</h1>
+   602→              <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 border-emerald-200">
+   603→                {photos.length} foto
+   604→              </Badge>
+   605→            </div>
+   606→            {album?.description && (
+   607→              <p className="text-sm text-muted-foreground mt-0.5">{album.description}</p>
+   608→            )}
+   609→          </div>
+   610→        </div>
+   611→        <Button onClick={onOpenUploadDialog} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 self-start">
+   612→          <Upload className="h-4 w-4" />
+   613→          Upload Foto
+   614→        </Button>
+   615→      </div>
+   616→
+   617→      <Separator className="mb-8" />
+   618→
+   619→      {/* Loading State */}
+   620→      {loading && photos.length === 0 && (
+   621→        <div className="flex items-center justify-center py-20">
+   622→          <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+   623→        </div>
+   624→      )}
+   625→
+   626→      {/* Empty Photos State */}
+   627→      {!loading && photos.length === 0 && (
+   628→        <motion.div
+   629→          initial={{ opacity: 0, y: 20 }}
+   630→          animate={{ opacity: 1, y: 0 }}
+   631→          className="flex flex-col items-center justify-center py-20 text-center"
+   632→        >
+   633→          <div className="rounded-full bg-emerald-50 p-6 mb-4">
+   634→            <ImageIcon className="h-12 w-12 text-emerald-500" />
+   635→          </div>
+   636→          <h3 className="text-lg font-semibold text-foreground">Belum ada foto</h3>
+   637→          <p className="text-muted-foreground mt-1 max-w-sm">
+   638→            Unggah foto pertama ke dalam album ini.
+   639→          </p>
+   640→          <Button
+   641→            onClick={onOpenUploadDialog}
+   642→            className="mt-6 bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+   643→          >
+   644→            <Upload className="h-4 w-4" />
+   645→            Upload Foto Pertama
+   646→          </Button>
+   647→        </motion.div>
+   648→      )}
+   649→
+   650→      {/* Photos Grid */}
+   651→      {!loading && photos.length > 0 && (
+   652→        <motion.div
+   653→          variants={staggerContainer}
+   654→          initial="initial"
+   655→          animate="animate"
+   656→          className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"
+   657→        >
+   658→          {photos.map((photo, index) => (
+   659→            <motion.div key={photo.id} variants={cardVariants}>
+   660→              <PhotoCard
+   661→                photo={photo}
+   662→                index={index}
+   663→                onDelete={onDeletePhoto}
+   664→                onOpenLightbox={onOpenLightbox}
+   665→                photos={photos}
+   666→              />
+   667→            </motion.div>
+   668→          ))}
+   669→        </motion.div>
+   670→      )}
+   671→    </section>
+   672→  )
+   673→}
+   674→
+   675→// ==================== PHOTO CARD ====================
+   676→
+   677→interface PhotoCardProps {
+   678→  photo: Photo
+   679→  index: number
+   680→  photos: Photo[]
+   681→  onDelete: (id: string) => void
+   682→  onOpenLightbox: (photos: Photo[], index: number) => void
+   683→}
+   684→
+   685→function PhotoCard({ photo, index, photos, onDelete, onOpenLightbox }: PhotoCardProps) {
+   686→  return (
+   687→    <motion.div
+   688→      whileHover={{ scale: 1.02 }}
+   689→      transition={{ duration: 0.2 }}
+   690→      className="relative group cursor-pointer rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow aspect-square"
+   691→      onClick={() => onOpenLightbox(photos, index)}
+   692→    >
+   693→      <img
+   694→        src={photo.url}
+   695→        alt={photo.filename}
+   696→        className="w-full h-full object-cover"
+   697→        loading="lazy"
+   698→      />
+   699→      {/* Hover overlay */}
+   700→      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors duration-200 flex items-center justify-center">
+   701→        <Button
+   702→          variant="ghost"
+   703→          size="sm"
+   704→          className="h-10 w-10 rounded-full bg-white/90 text-red-600 hover:bg-red-600 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-0 shadow-lg"
+   705→          onClick={(e) => {
+   706→            e.stopPropagation()
+   707→            onDelete(photo.id)
+   708→          }}
+   709→        >
+   710→          <Trash2 className="h-4 w-4" />
+   711→        </Button>
+   712→      </div>
+   713→    </motion.div>
+   714→  )
+   715→}
+   716→
+   717→// ==================== CREATE ALBUM DIALOG ====================
+   718→
+   719→interface CreateAlbumDialogProps {
+   720→  open: boolean
+   721→  onOpenChange: (open: boolean) => void
+   722→  name: string
+   723→  description: string
+   724→  onNameChange: (val: string) => void
+   725→  onDescriptionChange: (val: string) => void
+   726→  onSubmit: () => void
+   727→}
+   728→
+   729→function CreateAlbumDialog({
+   730→  open,
+   731→  onOpenChange,
+   732→  name,
+   733→  description,
+   734→  onNameChange,
+   735→  onDescriptionChange,
+   736→  onSubmit,
+   737→}: CreateAlbumDialogProps) {
+   738→  return (
+   739→    <Dialog open={open} onOpenChange={onOpenChange}>
+   740→      <DialogContent className="sm:max-w-md rounded-xl">
+   741→        <DialogHeader>
+   742→          <DialogTitle className="text-xl">Buat Album Baru</DialogTitle>
+   743→          <DialogDescription>Tambahkan album baru untuk mengorganisir foto Anda.</DialogDescription>
+   744→        </DialogHeader>
+   745→        <div className="space-y-4 py-2">
+   746→          <div className="space-y-2">
+   747→            <Label htmlFor="create-name">
+   748→              Nama Album <span className="text-red-500">*</span>
+   749→            </Label>
+   750→            <Input
+   751→              id="create-name"
+   752→              placeholder="Masukkan nama album"
+   753→              value={name}
+   754→              onChange={(e) => onNameChange(e.target.value)}
+   755→              onKeyDown={(e) => {
+   756→                if (e.key === 'Enter' && name.trim()) onSubmit()
+   757→              }}
+   758→              autoFocus
+   759→            />
+   760→          </div>
+   761→          <div className="space-y-2">
+   762→            <Label htmlFor="create-desc">Deskripsi <span className="text-muted-foreground text-xs">(opsional)</span></Label>
+   763→            <Textarea
+   764→              id="create-desc"
+   765→              placeholder="Deskripsi singkat tentang album ini"
+   766→              value={description}
+   767→              onChange={(e) => onDescriptionChange(e.target.value)}
+   768→              rows={3}
+   769→            />
+   770→          </div>
+   771→        </div>
+   772→        <DialogFooter className="gap-2 sm:gap-0">
+   773→          <Button variant="outline" onClick={() => onOpenChange(false)}>
+   774→            Batal
+   775→          </Button>
+   776→          <Button
+   777→            onClick={onSubmit}
+   778→            disabled={!name.trim()}
+   779→            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+   780→          >
+   781→            Buat Album
+   782→          </Button>
+   783→        </DialogFooter>
+   784→      </DialogContent>
+   785→    </Dialog>
+   786→  )
+   787→}
+   788→
+   789→// ==================== EDIT ALBUM DIALOG ====================
+   790→
+   791→interface EditAlbumDialogProps {
+   792→  open: boolean
+   793→  onOpenChange: (open: boolean) => void
+   794→  name: string
+   795→  description: string
+   796→  onNameChange: (val: string) => void
+   797→  onDescriptionChange: (val: string) => void
+   798→  onSubmit: () => void
+   799→}
+   800→
+   801→function EditAlbumDialog({
+   802→  open,
+   803→  onOpenChange,
+   804→  name,
+   805→  description,
+   806→  onNameChange,
+   807→  onDescriptionChange,
+   808→  onSubmit,
+   809→}: EditAlbumDialogProps) {
+   810→  return (
+   811→    <Dialog open={open} onOpenChange={onOpenChange}>
+   812→      <DialogContent className="sm:max-w-md rounded-xl">
+   813→        <DialogHeader>
+   814→          <DialogTitle className="text-xl">Edit Album</DialogTitle>
+   815→          <DialogDescription>Perbarui informasi album.</DialogDescription>
+   816→        </DialogHeader>
+   817→        <div className="space-y-4 py-2">
+   818→          <div className="space-y-2">
+   819→            <Label htmlFor="edit-name">
+   820→              Nama Album <span className="text-red-500">*</span>
+   821→            </Label>
+   822→            <Input
+   823→              id="edit-name"
+   824→              placeholder="Masukkan nama album"
+   825→              value={name}
+   826→              onChange={(e) => onNameChange(e.target.value)}
+   827→              onKeyDown={(e) => {
+   828→                if (e.key === 'Enter' && name.trim()) onSubmit()
+   829→              }}
+   830→              autoFocus
+   831→            />
+   832→          </div>
+   833→          <div className="space-y-2">
+   834→            <Label htmlFor="edit-desc">Deskripsi <span className="text-muted-foreground text-xs">(opsional)</span></Label>
+   835→            <Textarea
+   836→              id="edit-desc"
+   837→              placeholder="Deskripsi singkat tentang album ini"
+   838→              value={description}
+   839→              onChange={(e) => onDescriptionChange(e.target.value)}
+   840→              rows={3}
+   841→            />
+   842→          </div>
+   843→        </div>
+   844→        <DialogFooter className="gap-2 sm:gap-0">
+   845→          <Button variant="outline" onClick={() => onOpenChange(false)}>
+   846→            Batal
+   847→          </Button>
+   848→          <Button
+   849→            onClick={onSubmit}
+   850→            disabled={!name.trim()}
+   851→            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+   852→          >
+   853→            Simpan Perubahan
+   854→          </Button>
+   855→        </DialogFooter>
+   856→      </DialogContent>
+   857→    </Dialog>
+   858→  )
+   859→}
+   860→
+   861→// ==================== UPLOAD PHOTOS DIALOG ====================
+   862→
+   863→interface UploadPhotosDialogProps {
+   864→  open: boolean
+   865→  onOpenChange: (open: boolean) => void
+   866→  uploadMethod: 'local' | 'imgbb'
+   867→  onMethodChange: (method: 'local' | 'imgbb') => void
+   868→  selectedFiles: File[]
+   869→  previews: string[]
+   870→  imgbbApiKey: string
+   871→  showApiKey: boolean
+   872→  isDragOver: boolean
+   873→  uploading: boolean
+   874→  uploadProgress: number
+   875→  fileInputRef: React.RefObject<HTMLInputElement | null>
+   876→  onApiKeyChange: (val: string) => void
+   877→  onToggleShowApiKey: () => void
+   878→  onDragOver: (e: React.DragEvent) => void
+   879→  onDragLeave: (e: React.DragEvent) => void
+   880→  onDrop: (e: React.DragEvent) => void
+   881→  onSelectFiles: (files: FileList | null) => void
+   882→  onRemoveFile: (index: number) => void
+   883→  onClearFiles: () => void
+   884→  onUpload: () => void
+   885→}
+   886→
+   887→function UploadPhotosDialog({
+   888→  open,
+   889→  onOpenChange,
+   890→  uploadMethod,
+   891→  onMethodChange,
+   892→  selectedFiles,
+   893→  previews,
+   894→  imgbbApiKey,
+   895→  showApiKey,
+   896→  isDragOver,
+   897→  uploading,
+   898→  uploadProgress,
+   899→  fileInputRef,
+   900→  onApiKeyChange,
+   901→  onToggleShowApiKey,
+   902→  onDragOver,
+   903→  onDragLeave,
+   904→  onDrop,
+   905→  onSelectFiles,
+   906→  onRemoveFile,
+   907→  onClearFiles,
+   908→  onUpload,
+   909→}: UploadPhotosDialogProps) {
+   910→  const canUpload =
+   911→    !uploading &&
+   912→    selectedFiles.length > 0 &&
+   913→    (uploadMethod === 'local' || imgbbApiKey.trim().length > 0)
+   914→
+   915→  return (
+   916→    <Dialog open={open} onOpenChange={onOpenChange}>
+   917→      <DialogContent className="sm:max-w-lg rounded-xl max-h-[90vh] overflow-y-auto">
+   918→        <DialogHeader>
+   919→          <DialogTitle className="text-xl">Upload Foto</DialogTitle>
+   920→          <DialogDescription>Pilih metode dan file foto yang ingin diunggah.</DialogDescription>
+   921→        </DialogHeader>
+   922→
+   923→        <div className="space-y-5 py-2">
+   924→          {/* Upload Method Tabs */}
+   925→          <Tabs value={uploadMethod} onValueChange={(v) => onMethodChange(v as 'local' | 'imgbb')}>
+   926→            <TabsList className="grid w-full grid-cols-2">
+   927→              <TabsTrigger value="local" className="gap-2">
+   928→                <Upload className="h-4 w-4" />
+   929→                Lokal
+   930→              </TabsTrigger>
+   931→              <TabsTrigger value="imgbb" className="gap-2">
+   932→                <ImageIcon className="h-4 w-4" />
+   933→                ImgBB
+   934→              </TabsTrigger>
+   935→            </TabsList>
+   936→
+   937→            <TabsContent value="local" className="mt-4">
+   938→              <p className="text-sm text-muted-foreground">
+   939→                Foto akan disimpan secara lokal di server. Cocok untuk penggunaan pribadi.
+   940→              </p>
+   941→            </TabsContent>
+   942→
+   943→            <TabsContent value="imgbb" className="mt-4">
+   944→              <div className="space-y-3">
+   945→                <p className="text-sm text-muted-foreground">
+   946→                  Foto akan diunggah ke ImgBB dan URL publik akan disimpan.
+   947→                </p>
+   948→                <div className="space-y-2">
+   949→                  <Label htmlFor="imgbb-key">ImgBB API Key</Label>
+   950→                  <div className="relative">
+   951→                    <Input
+   952→                      id="imgbb-key"
+   953→                      type={showApiKey ? 'text' : 'password'}
+   954→                      placeholder="Masukkan API key ImgBB"
+   955→                      value={imgbbApiKey}
+   956→                      onChange={(e) => onApiKeyChange(e.target.value)}
+   957→                      className="pr-10"
+   958→                    />
+   959→                    <Button
+   960→                      type="button"
+   961→                      variant="ghost"
+   962→                      size="sm"
+   963→                      className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+   964→                      onClick={onToggleShowApiKey}
+   965→                    >
+   966→                      {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+   967→                    </Button>
+   968→                  </div>
+   969→                  <p className="text-xs text-muted-foreground">
+   970→                    API key akan disimpan di browser Anda untuk kemudahan penggunaan.
+   971→                  </p>
+   972→                </div>
+   973→              </div>
+   974→            </TabsContent>
+   975→          </Tabs>
+   976→
+   977→          <Separator />
+   978→
+   979→          {/* Drop Zone */}
+   980→          <div
+   981→            className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer ${
+   982→              isDragOver
+   983→                ? 'border-emerald-500 bg-emerald-50'
+   984→                : 'border-border hover:border-emerald-400 hover:bg-muted/50'
+   985→            }`}
+   986→            onDragOver={onDragOver}
+   987→            onDragLeave={onDragLeave}
+   988→            onDrop={onDrop}
+   989→            onClick={() => fileInputRef.current?.click()}
+   990→          >
+   991→            <input
+   992→              ref={fileInputRef}
+   993→              type="file"
+   994→              accept="image/*"
+   995→              multiple
+   996→              className="hidden"
+   997→              onChange={(e) => onSelectFiles(e.target.files)}
+   998→            />
+   999→            <div className="flex flex-col items-center gap-2">
+  1000→              <div className="rounded-full bg-emerald-50 p-3">
+  1001→                <Upload className="h-6 w-6 text-emerald-600" />
+  1002→              </div>
+  1003→              <p className="text-sm font-medium text-foreground">
+  1004→                Seret & lepas foto di sini
+  1005→              </p>
+  1006→              <p className="text-xs text-muted-foreground">atau klik untuk memilih file</p>
+  1007→              <p className="text-xs text-muted-foreground">Mendukung: JPG, PNG, GIF, WebP</p>
+  1008→            </div>
+  1009→          </div>
+  1010→
+  1011→          {/* Previews */}
+  1012→          {selectedFiles.length > 0 && (
+  1013→            <div className="space-y-3">
+  1014→              <div className="flex items-center justify-between">
+  1015→                <Label className="text-sm font-medium">
+  1016→                  File dipilih ({selectedFiles.length})
+  1017→                </Label>
+  1018→                <Button
+  1019→                  variant="ghost"
+  1020→                  size="sm"
+  1021→                  className="h-7 text-xs text-muted-foreground hover:text-red-600"
+  1022→                  onClick={onClearFiles}
+  1023→                >
+  1024→                  Hapus semua
+  1025→                </Button>
+  1026→              </div>
+  1027→              <div className="grid grid-cols-4 sm:grid-cols-5 gap-2 max-h-48 overflow-y-auto">
+  1028→                {previews.map((preview, idx) => (
+  1029→                  <div
+  1030→                    key={`${selectedFiles[idx]?.name}-${idx}`}
+  1031→                    className="relative aspect-square rounded-lg overflow-hidden group/thumb"
+  1032→                  >
+  1033→                    <img
+  1034→                      src={preview}
+  1035→                      alt={selectedFiles[idx]?.name || `Preview ${idx}`}
+  1036→                      className="w-full h-full object-cover"
+  1037→                    />
+  1038→                    <button
+  1039→                      type="button"
+  1040→                      className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity"
+  1041→                      onClick={(e) => {
+  1042→                        e.stopPropagation()
+  1043→                        onRemoveFile(idx)
+  1044→                      }}
+  1045→                    >
+  1046→                      <X className="h-3 w-3" />
+  1047→                    </button>
+  1048→                    <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] px-1 py-0.5 truncate">
+  1049→                      {selectedFiles[idx]?.name}
+  1050→                    </div>
+  1051→                  </div>
+  1052→                ))}
+  1053→              </div>
+  1054→            </div>
+  1055→          )}
+  1056→
+  1057→          {/* Upload Progress */}
+  1058→          {uploading && (
+  1059→            <div className="space-y-2">
+  1060→              <div className="flex items-center justify-between text-sm">
+  1061→                <span className="text-muted-foreground">Mengunggah...</span>
+  1062→                <span className="font-medium text-emerald-600">{Math.round(uploadProgress)}%</span>
+  1063→              </div>
+  1064→              <div className="h-2 bg-muted rounded-full overflow-hidden">
+  1065→                <motion.div
+  1066→                  className="h-full bg-emerald-500 rounded-full"
+  1067→                  initial={{ width: 0 }}
+  1068→                  animate={{ width: `${uploadProgress}%` }}
+  1069→                  transition={{ duration: 0.3 }}
+  1070→                />
+  1071→              </div>
+  1072→            </div>
+  1073→          )}
+  1074→        </div>
+  1075→
+  1076→        <DialogFooter className="gap-2 sm:gap-0">
+  1077→          <Button
+  1078→            variant="outline"
+  1079→            onClick={() => onOpenChange(false)}
+  1080→            disabled={uploading}
+  1081→          >
+  1082→            Batal
+  1083→          </Button>
+  1084→          <Button
+  1085→            onClick={onUpload}
+  1086→            disabled={!canUpload}
+  1087→            className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+  1088→          >
+  1089→            {uploading ? (
+  1090→              <>
+  1091→                <Loader2 className="h-4 w-4 animate-spin" />
+  1092→                Mengunggah...
+  1093→              </>
+  1094→            ) : (
+  1095→              <>
+  1096→                <Upload className="h-4 w-4" />
+  1097→                Upload ({selectedFiles.length})
+  1098→              </>
+  1099→            )}
+  1100→          </Button>
+  1101→        </DialogFooter>
+  1102→      </DialogContent>
+  1103→    </Dialog>
+  1104→  )
+  1105→}
+  1106→
+  1107→// ==================== PHOTO LIGHTBOX ====================
+  1108→
+  1109→interface LightboxProps {
+  1110→  lightbox: { open: boolean; currentIndex: number; photos: Photo[] }
+  1111→  onClose: () => void
+  1112→  onPrev: () => void
+  1113→  onNext: () => void
+  1114→}
+  1115→
+  1116→function PhotoLightbox({ lightbox, onClose, onPrev, onNext }: LightboxProps) {
+  1117→  const currentPhoto = lightbox.photos[lightbox.currentIndex]
+  1118→
+  1119→  return (
+  1120→    <AnimatePresence>
+  1121→      {lightbox.open && currentPhoto && (
+  1122→        <motion.div
+  1123→          variants={lightboxOverlayVariants}
+  1124→          initial="hidden"
+  1125→          animate="visible"
+  1126→          exit="exit"
+  1127→          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
+  1128→          onClick={onClose}
+  1129→        >
+  1130→          {/* Close button */}
+  1131→          <button
+  1132→            type="button"
+  1133→            className="absolute top-4 right-4 h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors z-10"
+  1134→            onClick={onClose}
+  1135→          >
+  1136→            <X className="h-5 w-5" />
+  1137→          </button>
+  1138→
+  1139→          {/* Counter */}
+  1140→          <div className="absolute top-4 left-4 text-white/80 text-sm font-medium bg-white/10 px-3 py-1 rounded-full">
+  1141→            {lightbox.currentIndex + 1} / {lightbox.photos.length}
+  1142→          </div>
+  1143→
+  1144→          {/* Prev button */}
+  1145→          {lightbox.photos.length > 1 && (
+  1146→            <button
+  1147→              type="button"
+  1148→              className="absolute left-4 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors z-10"
+  1149→              onClick={(e) => {
+  1150→                e.stopPropagation()
+  1151→                onPrev()
+  1152→              }}
+  1153→            >
+  1154→              <ChevronLeft className="h-6 w-6" />
+  1155→            </button>
+  1156→          )}
+  1157→
+  1158→          {/* Image */}
+  1159→          <motion.img
+  1160→            key={currentPhoto.id}
+  1161→            variants={lightboxImageVariants}
+  1162→            initial="hidden"
+  1163→            animate="visible"
+  1164→            exit="exit"
+  1165→            src={currentPhoto.url}
+  1166→            alt={currentPhoto.filename}
+  1167→            className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg"
+  1168→            onClick={(e) => e.stopPropagation()}
+  1169→          />
+  1170→
+  1171→          {/* Next button */}
+  1172→          {lightbox.photos.length > 1 && (
+  1173→            <button
+  1174→              type="button"
+  1175→              className="absolute right-4 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors z-10"
+  1176→              onClick={(e) => {
+  1177→                e.stopPropagation()
+  1178→                onNext()
+  1179→              }}
+  1180→            >
+  1181→              <ChevronRight className="h-6 w-6" />
+  1182→            </button>
+  1183→          )}
+  1184→        </motion.div>
+  1185→      )}
+  1186→    </AnimatePresence>
+  1187→  )
+  1188→}
+  1189→
