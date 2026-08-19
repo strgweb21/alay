@@ -1,0 +1,16 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=file:/app/db/custom.db
+      - IMGBB_API_KEY=${IMGBB_API_KEY:-}
+    volumes:
+      - uploads-data:/app/public/uploads
+      - db-data:/app/db
+    restart: unless-stopped
+
+volumes:
+  uploads-data:
+  db-data:
