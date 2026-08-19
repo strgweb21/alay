@@ -3,7 +3,7 @@ import { db } from '@/lib/db'
 import fs from 'fs'
 import path from 'path'
 
-// PUT /api/albums/[id] - Update album name/description
+// PUT /api/albums/[id] - Update album name/description/category
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -11,9 +11,8 @@ export async function PUT(
   try {
     const { id } = await params
     const body = await request.json()
-    const { name, description, coverUrl } = body
+    const { name, description, category, coverUrl } = body
 
-    // Verify album exists
     const existing = await db.album.findUnique({ where: { id } })
     if (!existing) {
       return NextResponse.json(
@@ -22,11 +21,7 @@ export async function PUT(
       )
     }
 
-    const updateData: {
-      name?: string
-      description?: string | null
-      coverUrl?: string | null
-    } = {}
+    const updateData: Record<string, unknown> = {}
 
     if (name !== undefined) {
       if (typeof name !== 'string' || name.trim().length === 0) {
@@ -40,6 +35,10 @@ export async function PUT(
 
     if (description !== undefined) {
       updateData.description = description?.trim() || null
+    }
+
+    if (category !== undefined) {
+      updateData.category = category?.trim() || null
     }
 
     if (coverUrl !== undefined) {
@@ -61,7 +60,7 @@ export async function PUT(
   }
 }
 
-// DELETE /api/albums/[id] - Delete album and cascade delete photos + local files
+// DELETE /api/albums/[id] - Delete album and cascade delete photos/videos
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -69,10 +68,9 @@ export async function DELETE(
   try {
     const { id } = await params
 
-    // Verify album exists
     const existing = await db.album.findUnique({
       where: { id },
-      include: { photos: true },
+      include: { photos: true, videos: true },
     })
     if (!existing) {
       return NextResponse.json(
@@ -81,18 +79,20 @@ export async function DELETE(
       )
     }
 
-    // Delete local upload directory if it exists
+    // Clean up local upload directory
     const uploadDir = path.join(process.cwd(), 'public', 'uploads', id)
     if (fs.existsSync(uploadDir)) {
       fs.rmSync(uploadDir, { recursive: true, force: true })
     }
 
-    // Delete album (photos are cascade deleted via Prisma schema)
     await db.album.delete({ where: { id } })
 
     return NextResponse.json({
       success: true,
-      data: { deletedPhotosCount: existing.photos.length },
+      data: {
+        deletedPhotosCount: existing.photos.length,
+        deletedVideosCount: existing.videos.length,
+      },
     })
   } catch (error) {
     console.error('Failed to delete album:', error)

@@ -26,23 +26,36 @@ model Post {
 }
 
 model Album {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   name        String
   description String?
+  category    String?
   coverUrl    String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   photos      Photo[]
+  videos      Video[]
 }
 
 model Photo {
+  id           String   @id @default(cuid())
+  albumId      String
+  filename     String
+  url          String
+  thumbnailUrl String?
+  source       String   @default("imgbb")
+  size         Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  album        Album    @relation(fields: [albumId], references: [id], onDelete: Cascade)
+}
+
+model Video {
   id          String   @id @default(cuid())
   albumId     String
-  filename    String
+  title       String
   url         String
   thumbnailUrl String?
-  source      String   @default("local") // "local" or "imgbb"
- size        Int?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   album       Album    @relation(fields: [albumId], references: [id], onDelete: Cascade)

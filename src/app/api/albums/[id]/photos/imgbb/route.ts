@@ -9,7 +9,6 @@ export async function POST(
   try {
     const { id } = await params
 
-    // Verify album exists
     const album = await db.album.findUnique({ where: { id } })
     if (!album) {
       return NextResponse.json(
@@ -43,11 +42,9 @@ export async function POST(
 
     for (const file of files) {
       try {
-        // Convert file to base64
         const buffer = Buffer.from(await file.arrayBuffer())
         const base64 = buffer.toString('base64')
 
-        // Upload to ImgBB
         const imgbbFormData = new FormData()
         imgbbFormData.append('key', apiKey)
         imgbbFormData.append('image', base64)
@@ -72,7 +69,6 @@ export async function POST(
           continue
         }
 
-        // Create Photo record
         const photo = await db.photo.create({
           data: {
             albumId: id,
@@ -86,7 +82,6 @@ export async function POST(
 
         createdPhotos.push(photo)
 
-        // Set first photo as cover if album has no cover
         if (needsCoverUpdate) {
           await db.album.update({
             where: { id },
@@ -107,14 +102,8 @@ export async function POST(
       )
     }
 
-    const responseData: {
-      photos: typeof createdPhotos
-      errors?: string[]
-    } = { photos: createdPhotos }
-
-    if (errors.length > 0) {
-      responseData.errors = errors
-    }
+    const responseData: { photos: typeof createdPhotos; errors?: string[] } = { photos: createdPhotos }
+    if (errors.length > 0) responseData.errors = errors
 
     const statusCode = errors.length > 0 && createdPhotos.length > 0 ? 207 : 201
     return NextResponse.json({ success: true, data: responseData }, { status: statusCode })

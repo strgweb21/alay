@@ -9,10 +9,11 @@ export interface Album {
   id: string
   name: string
   description: string | null
+  category: string | null
   coverUrl: string | null
   createdAt: string
   updatedAt: string
-  _count: { photos: number }
+  _count: { photos: number; videos: number; total: number }
 }
 
 export interface Photo {
@@ -27,12 +28,26 @@ export interface Photo {
   updatedAt: string
 }
 
-type ViewType = 'albums' | 'photos'
+export interface Video {
+  id: string
+  albumId: string
+  title: string
+  url: string
+  thumbnailUrl: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+type ViewType = 'albums' | 'items'
+
+type MediaItem =
+  | { type: 'photo'; data: Photo }
+  | { type: 'video'; data: Video }
 
 interface LightboxState {
   open: boolean
   currentIndex: number
-  photos: Photo[]
+  items: MediaItem[]
 }
 
 interface AlbumStore {
@@ -40,31 +55,45 @@ interface AlbumStore {
   view: ViewType
   albums: Album[]
   photos: Photo[]
+  videos: Video[]
+  categories: string[]
   selectedAlbum: Album | null
   lightbox: LightboxState
   loading: boolean
   uploading: boolean
   uploadProgress: number
+  searchQuery: string
+  searchCategory: string
 
   // Actions - Navigation
   setView: (view: ViewType, albumId?: string) => void
 
+  // Actions - Search & Filter
+  setSearch: (query: string) => void
+  setFilterCategory: (category: string) => void
+
   // Actions - Albums
   fetchAlbums: () => Promise<void>
-  createAlbum: (data: { name: string; description?: string }) => Promise<boolean>
-  updateAlbum: (id: string, data: { name?: string; description?: string }) => Promise<boolean>
+  createAlbum: (data: { name: string; description?: string; category?: string }) => Promise<boolean>
+  updateAlbum: (id: string, data: { name?: string; description?: string; category?: string }) => Promise<boolean>
   deleteAlbum: (id: string) => Promise<boolean>
+  fetchCategories: () => Promise<void>
 
   // Actions - Photos
   fetchPhotos: (albumId: string) => Promise<void>
-  uploadPhotos: (albumId: string, files: File[], method: 'local' | 'imgbb', apiKey?: string) => Promise<boolean>
+  uploadPhotos: (albumId: string, files: File[], apiKey: string) => Promise<boolean>
   deletePhoto: (id: string) => Promise<boolean>
 
+  // Actions - Videos
+  fetchVideos: (albumId: string) => Promise<void>
+  addVideo: (albumId: string, title: string, url: string) => Promise<boolean>
+  deleteVideo: (id: string) => Promise<boolean>
+
   // Actions - Lightbox
-  openLightbox: (photos: Photo[], index: number) => void
+  openLightbox: (items: MediaItem[], index: number) => void
   closeLightbox: () => void
-  nextPhoto: () => void
-  prevPhoto: () => void
+  nextItem: () => void
+  prevItem: () => void
 }
 
 // ---------- Helpers ----------
@@ -87,23 +116,40 @@ export const useAlbumStore = create<AlbumStore>((set, get) => ({
   view: 'albums',
   albums: [],
   photos: [],
+  videos: [],
+  categories: [],
   selectedAlbum: null,
-  lightbox: { open: false, currentIndex: 0, photos: [] },
+  lightbox: { open: false, currentIndex: 0, items: [] },
   loading: false,
   uploading: false,
   uploadProgress: 0,
+  searchQuery: '',
+  searchCategory: '',
 
   // ---------- Navigation ----------
 
   setView: (view, albumId) => {
-    if (view === 'photos' && albumId) {
+    if (view === 'items' && albumId) {
       const album = get().albums.find((a) => a.id === albumId) || null
-      set({ view: 'photos', selectedAlbum: album })
+      set({ view: 'items', selectedAlbum: album })
       get().fetchPhotos(albumId)
+      get().fetchVideos(albumId)
     } else {
-      set({ view: 'albums', selectedAlbum: null, photos: [] })
+      set({ view: 'albums', selectedAlbum: null, photos: [], videos: [] })
       get().fetchAlbums()
     }
+  },
+
+  // ---------- Search & Filter ----------
+
+  setSearch: (query) => {
+    set({ searchQuery: query })
+    get().fetchAlbums()
+  },
+
+  setFilterCategory: (category) => {
+    set({ searchCategory: category })
+    get().fetchAlbums()
   },
 
   // ---------- Albums ----------
@@ -111,7 +157,12 @@ export const useAlbumStore = create<AlbumStore>((set, get) => ({
   fetchAlbums: async () => {
     set({ loading: true })
     try {
-      const res = await fetch('/api/albums')
+      const { searchQuery, searchCategory } = get()
+      const params = new URLSearchParams()
+      if (searchQuery) params.set('search', searchQuery)
+      if (searchCategory) params.set('category', searchCategory)
+      const qs = params.toString()
+      const res = await fetch(`/api/albums${qs ? `?${qs}` : ''}`)
       const json = await res.json()
       if (json.success) {
         set({ albums: json.data })
@@ -136,6 +187,7 @@ export const useAlbumStore = create<AlbumStore>((set, get) => ({
       if (json.success) {
         toast({ title: 'Album dibuat', description: `"${data.name}" berhasil dibuat` })
         await get().fetchAlbums()
+        await get().fetchCategories()
         return true
       } else {
         toast({ title: 'Gagal membuat album', description: json.error, variant: 'destructive' })
@@ -158,7 +210,7 @@ export const useAlbumStore = create<AlbumStore>((set, get) => ({
       if (json.success) {
         toast({ title: 'Album diperbarui', description: 'Perubahan berhasil disimpan' })
         await get().fetchAlbums()
-        // Update selectedAlbum if it's the one being edited
+        await get().fetchCategories()
         const current = get().selectedAlbum
         if (current && current.id === id) {
           set({ selectedAlbum: { ...current, ...data } })
@@ -182,6 +234,7 @@ export const useAlbumStore = create<AlbumStore>((set, get) => ({
       if (json.success) {
         toast({ title: 'Album dihapus', description: `"${album?.name || 'Album'}" berhasil dihapus` })
         await get().fetchAlbums()
+        await get().fetchCategories()
         return true
       } else {
         toast({ title: 'Gagal menghapus album', description: json.error, variant: 'destructive' })
@@ -190,6 +243,18 @@ export const useAlbumStore = create<AlbumStore>((set, get) => ({
     } catch {
       toast({ title: 'Error', description: 'Gagal terhubung ke server', variant: 'destructive' })
       return false
+    }
+  },
+
+  fetchCategories: async () => {
+    try {
+      const res = await fetch('/api/categories')
+      const json = await res.json()
+      if (json.success) {
+        set({ categories: json.data })
+      }
+    } catch {
+      // silent
     }
   },
 
@@ -212,30 +277,25 @@ export const useAlbumStore = create<AlbumStore>((set, get) => ({
     }
   },
 
-  uploadPhotos: async (albumId, files, method, apiKey) => {
+  uploadPhotos: async (albumId, files, apiKey) => {
     set({ uploading: true, uploadProgress: 0 })
     try {
       const formData = new FormData()
       for (const file of files) {
         formData.append('files', file)
       }
-      if (method === 'imgbb' && apiKey) {
-        formData.append('apiKey', apiKey)
-      }
+      formData.append('apiKey', apiKey)
 
-      const endpoint =
-        method === 'imgbb'
-          ? `/api/albums/${albumId}/photos/imgbb`
-          : `/api/albums/${albumId}/photos`
-
-      // Simulate progress (real progress with XHR is complex, use a simple animation)
       let progress = 0
       const interval = setInterval(() => {
         progress = Math.min(progress + Math.random() * 15, 90)
         set({ uploadProgress: progress })
       }, 300)
 
-      const res = await fetch(endpoint, { method: 'POST', body: formData })
+      const res = await fetch(`/api/albums/${albumId}/photos/imgbb`, {
+        method: 'POST',
+        body: formData,
+      })
       clearInterval(interval)
       set({ uploadProgress: 100 })
 
@@ -245,8 +305,8 @@ export const useAlbumStore = create<AlbumStore>((set, get) => ({
         const partialErrors = json.data?.errors
         if (partialErrors && partialErrors.length > 0) {
           toast({
-            title: `${uploadedCount} foto berhasil diunggah`,
-            description: `${partialErrors.length} gagal. Lihat konsol untuk detail.`,
+            title: `${uploadedCount} foto berhasil`,
+            description: `${partialErrors.length} gagal. Cek konsol untuk detail.`,
             variant: 'destructive',
           })
           console.warn('Partial upload errors:', partialErrors)
@@ -254,7 +314,7 @@ export const useAlbumStore = create<AlbumStore>((set, get) => ({
           toast({ title: 'Berhasil', description: `${uploadedCount} foto berhasil diunggah` })
         }
         await get().fetchPhotos(albumId)
-        await get().fetchAlbums() // refresh cover
+        await get().fetchAlbums()
         return true
       } else {
         toast({ title: 'Gagal mengunggah', description: json.error, variant: 'destructive' })
@@ -290,27 +350,86 @@ export const useAlbumStore = create<AlbumStore>((set, get) => ({
     }
   },
 
+  // ---------- Videos ----------
+
+  fetchVideos: async (albumId) => {
+    try {
+      const res = await fetch(`/api/albums/${albumId}/videos`)
+      const json = await res.json()
+      if (json.success) {
+        set({ videos: json.data })
+      }
+    } catch {
+      // silent
+    }
+  },
+
+  addVideo: async (albumId, title, url) => {
+    try {
+      const res = await fetch(`/api/albums/${albumId}/videos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, url }),
+      })
+      const json = await res.json()
+      if (json.success) {
+        toast({ title: 'Video ditambahkan', description: `"${title}" berhasil ditambahkan` })
+        await get().fetchVideos(albumId)
+        await get().fetchAlbums()
+        return true
+      } else {
+        toast({ title: 'Gagal menambahkan video', description: json.error, variant: 'destructive' })
+        return false
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Gagal terhubung ke server', variant: 'destructive' })
+      return false
+    }
+  },
+
+  deleteVideo: async (id) => {
+    try {
+      const res = await fetch(`/api/videos/${id}`, { method: 'DELETE' })
+      const json = await res.json()
+      if (json.success) {
+        toast({ title: 'Video dihapus', description: 'Video berhasil dihapus' })
+        const albumId = get().selectedAlbum?.id
+        if (albumId) {
+          await get().fetchVideos(albumId)
+          await get().fetchAlbums()
+        }
+        return true
+      } else {
+        toast({ title: 'Gagal menghapus video', description: json.error, variant: 'destructive' })
+        return false
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Gagal terhubung ke server', variant: 'destructive' })
+      return false
+    }
+  },
+
   // ---------- Lightbox ----------
 
-  openLightbox: (photos, index) => {
-    set({ lightbox: { open: true, currentIndex: index, photos } })
+  openLightbox: (items, index) => {
+    set({ lightbox: { open: true, currentIndex: index, items } })
   },
 
   closeLightbox: () => {
-    set({ lightbox: { open: false, currentIndex: 0, photos: [] } })
+    set({ lightbox: { open: false, currentIndex: 0, items: [] } })
   },
 
-  nextPhoto: () => {
+  nextItem: () => {
     const { lightbox } = get()
-    if (lightbox.photos.length === 0) return
-    const nextIndex = (lightbox.currentIndex + 1) % lightbox.photos.length
-    set({ lightbox: { ...lightbox, currentIndex: nextIndex } })
+    if (lightbox.items.length === 0) return
+    const next = (lightbox.currentIndex + 1) % lightbox.items.length
+    set({ lightbox: { ...lightbox, currentIndex: next } })
   },
 
-  prevPhoto: () => {
+  prevItem: () => {
     const { lightbox } = get()
-    if (lightbox.photos.length === 0) return
-    const prevIndex = (lightbox.currentIndex - 1 + lightbox.photos.length) % lightbox.photos.length
-    set({ lightbox: { ...lightbox, currentIndex: prevIndex } })
+    if (lightbox.items.length === 0) return
+    const prev = (lightbox.currentIndex - 1 + lightbox.items.length) % lightbox.items.length
+    set({ lightbox: { ...lightbox, currentIndex: prev } })
   },
 }))
