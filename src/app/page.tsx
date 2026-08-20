@@ -428,6 +428,8 @@ export default function Home() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="2">2 Kolom</SelectItem>
+                      <SelectItem value="3">3 Kolom</SelectItem>
                       <SelectItem value="4">4 Kolom</SelectItem>
                       <SelectItem value="5">5 Kolom</SelectItem>
                       <SelectItem value="6">6 Kolom</SelectItem>
@@ -540,7 +542,14 @@ export default function Home() {
               ) : (
                 /* ============ GRID VIEW ============ */
                 <motion.div
-                  className={`grid grid-cols-2 sm:grid-cols-3 ${gridCols === 5 ? 'lg:grid-cols-5' : gridCols === 6 ? 'lg:grid-cols-6' : 'lg:grid-cols-4'} gap-4 sm:gap-4`}
+                  className={[
+                    'grid gap-3 sm:gap-4',
+                    gridCols === 2 && 'grid-cols-1 sm:grid-cols-2',
+                    gridCols === 3 && 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
+                    gridCols === 4 && 'grid-cols-2 sm:grid-cols-2 lg:grid-cols-4',
+                    gridCols === 5 && 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5',
+                    gridCols === 6 && 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-6',
+                  ].filter(Boolean).join(' ')}
                   variants={staggerContainer}
                   initial="initial"
                   animate="animate"
