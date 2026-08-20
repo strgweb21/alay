@@ -255,27 +255,7 @@ export default function Home() {
 
   const handleAddVideo = async () => {
     if (!selectedAlbum || !videoTitle.trim() || !videoUrl.trim()) return
-
-    let detectedThumbnail: string | undefined = undefined
-
-    // Deteksi jika link merupakan TurboVid atau player berbasis JW Player (.jw-preview)
-    if (videoUrl.includes('turbovid') || videoUrl.includes('jwplayer')) {
-      // Jika ada pola ID video di URL, kita rakit link thumbnail bawaannya
-      const match = videoUrl.match(/\/(?:v|embed|e)\/([a-zA-Z0-9]+)/)
-      if (match && match[1]) {
-        // Kebanyakan CDN TurboVid/JWPlayer menyimpan preview di struktur gambar berikut:
-        detectedThumbnail = `https://turbovid.eu/images/${match[1]}.jpg` 
-      }
-    }
-
-    // Panggil fungsi addVideo dari store (pastikan store menerima thumbnailUrl jika ada)
-    const ok = await addVideo(
-      selectedAlbum.id, 
-      videoTitle.trim(), 
-      videoUrl.trim(),
-      detectedThumbnail
-    )
-
+    const ok = await addVideo(selectedAlbum.id, videoTitle.trim(), videoUrl.trim())
     if (ok) {
       setVideoTitle('')
       setVideoUrl('')
@@ -1025,8 +1005,8 @@ function MediaCard({ item, index, onClick, onDelete, className }: {
 }) {
   const isVideo = item.type === 'video'
   const videoData = isVideo ? (item.data as Video) : null
-
-  // Prioritaskan thumbnailUrl bawaan dari TurboVid / Player (.jw-preview)
+  
+  // Ambil thumbnail dari thumbnailUrl, atau coba ekstraksi jika ada format khusus turbovid
   const src = isVideo
     ? videoData?.thumbnailUrl || ''
     : (item.data as Photo).url
@@ -1039,43 +1019,42 @@ function MediaCard({ item, index, onClick, onDelete, className }: {
     <motion.div
       variants={cardVariants}
       layout
-      className={`relative rounded-xl overflow-hidden group cursor-pointer bg-black/5 ${className || ''}`}
+      className={`relative rounded-xl overflow-hidden group cursor-pointer ${className || ''}`}
       onClick={onClick}
     >
       {src ? (
-        <div className="relative aspect-video w-full overflow-hidden">
-          <img
-            src={src}
-            alt={title}
-            className="jw-preview w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-            onError={(e) => {
-              // Jika thumbnail khusus gagal dimuat, hilangkan agar tidak merusak tampilan
-              (e.target as HTMLElement).style.display = 'none'
-            }}
+        <img
+          src={src}
+          alt={title}
+          className="jw-preview w-full h-auto block object-cover"
+        />
+      ) : isVideo ? (
+        /* Jika thumbnail tidak ada, gunakan iframe embed bawaan player untuk menampilkan poster/preview asli */
+        <div className="relative w-full aspect-video overflow-hidden pointer-events-none">
+          <iframe
+            src={videoData?.url}
+            title={title}
+            className="jw-preview w-full h-full border-0 pointer-events-none"
+            tabIndex={-1}
           />
-          {isVideo && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-black/20">
-              <div className="bg-black/60 rounded-full p-3 backdrop-blur-sm group-hover:scale-110 transition-transform">
-                <Play className="h-7 w-7 text-white fill-white" />
-              </div>
-            </div>
-          )}
         </div>
       ) : (
-        <div className="w-full aspect-video bg-muted flex flex-col items-center justify-center gap-2">
-          {isVideo ? (
-            <>
-              <Video className="h-10 w-10 text-muted-foreground/40" />
-              <span className="text-xs text-muted-foreground font-medium">{title}</span>
-            </>
-          ) : (
-            <ImageIcon className="h-10 w-10 text-muted-foreground/40" />
-          )}
+        <div className="w-full aspect-square bg-muted flex items-center justify-center">
+          <ImageIcon className="h-10 w-10 text-muted-foreground/40" />
         </div>
       )}
 
-      {/* Overlay Hapus */}
-      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors">
+      {/* Video play icon overlay */}
+      {isVideo && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+          <div className="bg-black/50 rounded-full p-3">
+            <Play className="h-8 w-8 text-white fill-white" />
+          </div>
+        </div>
+      )}
+
+      {/* Delete overlay */}
+      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors z-20">
         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
           <Button
             variant="destructive"
