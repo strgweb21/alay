@@ -543,7 +543,7 @@ export default function Home() {
                 /* ============ GRID VIEW ============ */
                 <motion.div
                   className={[
-                    'grid gap-3 sm:gap-4',
+                    'grid gap-0.5 sm:gap-1', // Jarak antar card dibuat sangat minimal
                     gridCols === 2 && 'grid-cols-1 sm:grid-cols-2',
                     gridCols === 3 && 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
                     gridCols === 4 && 'grid-cols-2 sm:grid-cols-2 lg:grid-cols-4',
@@ -1006,7 +1006,6 @@ function MediaCard({ item, index, onClick, onDelete, className }: {
   const isVideo = item.type === 'video'
   const videoData = isVideo ? (item.data as Video) : null
   
-  // Ambil thumbnail dari thumbnailUrl, atau coba ekstraksi jika ada format khusus turbovid
   const src = isVideo
     ? videoData?.thumbnailUrl || ''
     : (item.data as Photo).url
@@ -1019,7 +1018,7 @@ function MediaCard({ item, index, onClick, onDelete, className }: {
     <motion.div
       variants={cardVariants}
       layout
-      className={`relative rounded-xl overflow-hidden group cursor-pointer ${className || ''}`}
+      className={`relative overflow-hidden group cursor-pointer ${className || ''}`}
       onClick={onClick}
     >
       {src ? (
@@ -1029,7 +1028,6 @@ function MediaCard({ item, index, onClick, onDelete, className }: {
           className="jw-preview w-full h-auto block object-cover"
         />
       ) : isVideo ? (
-        /* Jika thumbnail tidak ada, gunakan iframe embed bawaan player untuk menampilkan poster/preview asli */
         <div className="relative w-full aspect-video overflow-hidden pointer-events-none">
           <iframe
             src={videoData?.url}
@@ -1044,22 +1042,13 @@ function MediaCard({ item, index, onClick, onDelete, className }: {
         </div>
       )}
 
-      {/* Video play icon overlay */}
-      {isVideo && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-          <div className="bg-black/50 rounded-full p-3">
-            <Play className="h-8 w-8 text-white fill-white" />
-          </div>
-        </div>
-      )}
-
       {/* Delete overlay */}
       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors z-20">
         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
           <Button
             variant="destructive"
             size="icon"
-            className="h-8 w-8 rounded-full shadow-lg"
+            className="h-8 w-8 rounded-none shadow-lg"
             onClick={(e) => {
               e.stopPropagation()
               onDelete()
