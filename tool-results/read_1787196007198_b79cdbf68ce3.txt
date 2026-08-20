@@ -1,0 +1,1052 @@
+     1→     1→'use client'
+     2→     2→
+     3→     3→import { useEffect, useState, useRef, useMemo, useCallback } from 'react'
+     4→     4→import { motion, AnimatePresence } from 'framer-motion'
+     5→     5→import {
+     6→     6→  Plus,
+     7→     7→  ArrowLeft,
+     8→     8→  Upload,
+     9→     9→  Trash2,
+    10→    10→  Pencil,
+    11→    11→  X,
+    12→    12→  ChevronLeft,
+    13→    13→  ChevronRight,
+    14→    14→  Search,
+    15→    15→  FolderOpen,
+    16→    16→  Loader2,
+    17→    17→  Play,
+    18→    18→  Video,
+    19→    19→  Image as ImageIcon,
+    20→    20→  Tag,
+    21→    21→  Eye,
+    22→    22→  EyeOff,
+    23→    23→  LayoutGrid,
+    24→    24→  Rows3,
+    25→    25→  ArrowRightLeft,
+    26→    26→  ChevronDown,
+    27→    27→} from 'lucide-react'
+    28→    28→
+    29→    29→import { Button } from '@/components/ui/button'
+    30→    30→import { Card, CardContent } from '@/components/ui/card'
+    31→    31→import {
+    32→    32→  Dialog,
+    33→    33→  DialogContent,
+    34→    34→  DialogHeader,
+    35→    35→  DialogTitle,
+    36→    36→  DialogFooter,
+    37→    37→  DialogDescription,
+    38→    38→} from '@/components/ui/dialog'
+    39→    39→import { Input } from '@/components/ui/input'
+    40→    40→import { Label } from '@/components/ui/label'
+    41→    41→import { Textarea } from '@/components/ui/textarea'
+    42→    42→import { Badge } from '@/components/ui/badge'
+    43→    43→import { Progress } from '@/components/ui/progress'
+    44→    44→import {
+    45→    45→  DropdownMenu,
+    46→    46→  DropdownMenuTrigger,
+    47→    47→  DropdownMenuContent,
+    48→    48→  DropdownMenuItem,
+    49→    49→} from '@/components/ui/dropdown-menu'
+    50→    50→import {
+    51→    51→  Select,
+    52→    52→  SelectContent,
+    53→    53→  SelectItem,
+    54→    54→  SelectTrigger,
+    55→    55→  SelectValue,
+    56→    56→} from '@/components/ui/select'
+    57→    57→import {
+    58→    58→  useAlbumStore,
+    59→    59→  formatDate,
+    60→    60→  type Album,
+    61→    61→  type Photo,
+    62→    62→  type Video,
+    63→    63→  type MediaItem,
+    64→    64→} from '@/lib/store'
+    65→    65→
+    66→    66→// ==================== ANIMATIONS ====================
+    67→    67→
+    68→    68→const staggerContainer = {
+    69→    69→  animate: { transition: { staggerChildren: 0.05 } },
+    70→    70→}
+    71→    71→
+    72→    72→const cardVariants = {
+    73→    73→  initial: { opacity: 0, y: 20, scale: 0.95 },
+    74→    74→  animate: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.3, ease: 'easeOut' } },
+    75→    75→}
+    76→    76→
+    77→    77→const pageVariants = {
+    78→    78→  initial: { opacity: 0, x: 30 },
+    79→    79→  animate: { opacity: 1, x: 0, transition: { duration: 0.25, ease: 'easeOut' } },
+    80→    80→  exit: { opacity: 0, x: -30, transition: { duration: 0.2, ease: 'easeIn' } },
+    81→    81→}
+    82→    82→
+    83→    83→// ==================== MAIN PAGE ====================
+    84→    84→
+    85→    85→export default function Home() {
+    86→    86→  const {
+    87→    87→    view,
+    88→    88→    albums,
+    89→    89→    photos,
+    90→    90→    videos,
+    91→    91→    categories,
+    92→    92→    selectedAlbum,
+    93→    93→    lightbox,
+    94→    94→    loading,
+    95→    95→    uploading,
+    96→    96→    uploadProgress,
+    97→    97→    searchQuery,
+    98→    98→    searchCategory,
+    99→    99→    setView,
+   100→   100→    setSearch,
+   101→   101→    setFilterCategory,
+   102→   102→    fetchAlbums,
+   103→   103→    createAlbum,
+   104→   104→    updateAlbum,
+   105→   105→    deleteAlbum,
+   106→   106→    fetchCategories,
+   107→   107→    uploadPhotos,
+   108→   108→    deletePhoto,
+   109→   109→    fetchVideos,
+   110→   110→    addVideo,
+   111→   111→    deleteVideo,
+   112→   112→    openLightbox,
+   113→   113→    closeLightbox,
+   114→   114→    nextItem,
+   115→   115→    prevItem,
+   116→   116→  } = useAlbumStore()
+   117→   117→
+   118→   118→  // Dialog states
+   119→   119→  const [createDialogOpen, setCreateDialogOpen] = useState(false)
+   120→   120→  const [editDialogOpen, setEditDialogOpen] = useState(false)
+   121→   121→  const [uploadDialogOpen, setUploadDialogOpen] = useState(false)
+   122→   122→  const [videoDialogOpen, setVideoDialogOpen] = useState(false)
+   123→   123→
+   124→   124→  // Album form
+   125→   125→  const [newAlbumName, setNewAlbumName] = useState('')
+   126→   126→  const [newAlbumDesc, setNewAlbumDesc] = useState('')
+   127→   127→  const [newAlbumCategory, setNewAlbumCategory] = useState('')
+   128→   128→  const [editAlbumName, setEditAlbumName] = useState('')
+   129→   129→  const [editAlbumDesc, setEditAlbumDesc] = useState('')
+   130→   130→  const [editAlbumCategory, setEditAlbumCategory] = useState('')
+   131→   131→  const [editingAlbum, setEditingAlbum] = useState<Album | null>(null)
+   132→   132→
+   133→   133→  // View mode
+   134→   134→  type ViewMode = 'grid' | 'list' | 'horizontal'
+   135→   135→  const [viewMode, setViewMode] = useState<ViewMode>('grid')
+   136→   136→  const [gridCols, setGridCols] = useState(4)
+   137→   137→
+   138→   138→  // Upload states
+   139→   139→  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+   140→   140→  const [previews, setPreviews] = useState<string[]>([])
+   141→   141→  const [imgbbApiKey, setImgbbApiKey] = useState(() => {
+   142→   142→    if (typeof window !== 'undefined') {
+   143→   143→      return localStorage.getItem('imgbb_api_key') || ''
+   144→   144→    }
+   145→   145→    return ''
+   146→   146→  })
+   147→   147→  const [showApiKey, setShowApiKey] = useState(false)
+   148→   148→  const [isDragOver, setIsDragOver] = useState(false)
+   149→   149→  const fileInputRef = useRef<HTMLInputElement>(null)
+   150→   150→
+   151→   151→  // Video form
+   152→   152→  const [videoTitle, setVideoTitle] = useState('')
+   153→   153→  const [videoUrl, setVideoUrl] = useState('')
+   154→   154→
+   155→   155→  // Computed: merged media items for album view
+   156→   156→  const mediaItems = useMemo<MediaItem[]>(() => {
+   157→   157→    const items: MediaItem[] = []
+   158→   158→    // Combine photos and videos sorted by createdAt desc
+   159→   159→    const combined = [
+   160→   160→      ...photos.map((p) => ({ type: 'photo' as const, data: p, createdAt: p.createdAt })),
+   161→   161→      ...videos.map((v) => ({ type: 'video' as const, data: v, createdAt: v.createdAt })),
+   162→   162→    ]
+   163→   163→    combined.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+   164→   164→    return combined.map((c) => ({ type: c.type, data: c.data }))
+   165→   165→  }, [photos, videos])
+   166→   166→
+   167→   167→  // Fetch albums and categories on mount
+   168→   168→  useEffect(() => {
+   169→   169→    fetchAlbums()
+   170→   170→    fetchCategories()
+   171→   171→  }, [fetchAlbums, fetchCategories])
+   172→   172→
+   173→   173→  // Keyboard nav for lightbox
+   174→   174→  useEffect(() => {
+   175→   175→    if (!lightbox.open) return
+   176→   176→    const handle = (e: KeyboardEvent) => {
+   177→   177→      if (e.key === 'Escape') closeLightbox()
+   178→   178→      if (e.key === 'ArrowRight') nextItem()
+   179→   179→      if (e.key === 'ArrowLeft') prevItem()
+   180→   180→    }
+   181→   181→    window.addEventListener('keydown', handle)
+   182→   182→    return () => window.removeEventListener('keydown', handle)
+   183→   183→  }, [lightbox.open, closeLightbox, nextItem, prevItem])
+   184→   184→
+   185→   185→  // File handling
+   186→   186→  const handleFiles = useCallback((files: FileList | null) => {
+   187→   187→    if (!files) return
+   188→   188→    const arr = Array.from(files).filter((f) => f.type.startsWith('image/'))
+   189→   189→    setSelectedFiles((prev) => [...prev, ...arr])
+   190→   190→    arr.forEach((file) => {
+   191→   191→      const reader = new FileReader()
+   192→   192→      reader.onload = (e) => {
+   193→   193→        setPreviews((prev) => [...prev, e.target?.result as string])
+   194→   194→      }
+   195→   195→      reader.readAsDataURL(file)
+   196→   196→    })
+   197→   197→  }, [])
+   198→   198→
+   199→   199→  const handleRemoveFile = (index: number) => {
+   200→   200→    setSelectedFiles((prev) => prev.filter((_, i) => i !== index))
+   201→   201→    setPreviews((prev) => prev.filter((_, i) => i !== index))
+   202→   202→  }
+   203→   203→
+   204→   204→  const handleClearFiles = () => {
+   205→   205→    setSelectedFiles([])
+   206→   206→    setPreviews([])
+   207→   207→  }
+   208→   208→
+   209→   209→  // Handlers
+   210→   210→  const handleCreateAlbum = async () => {
+   211→   211→    if (!newAlbumName.trim()) return
+   212→   212→    const ok = await createAlbum({
+   213→   213→      name: newAlbumName.trim(),
+   214→   214→      description: newAlbumDesc.trim() || undefined,
+   215→   215→      category: newAlbumCategory.trim() || undefined,
+   216→   216→    })
+   217→   217→    if (ok) {
+   218→   218→      setNewAlbumName('')
+   219→   219→      setNewAlbumDesc('')
+   220→   220→      setNewAlbumCategory('')
+   221→   221→      setCreateDialogOpen(false)
+   222→   222→    }
+   223→   223→  }
+   224→   224→
+   225→   225→  const handleEditAlbum = (album: Album) => {
+   226→   226→    setEditingAlbum(album)
+   227→   227→    setEditAlbumName(album.name)
+   228→   228→    setEditAlbumDesc(album.description || '')
+   229→   229→    setEditAlbumCategory(album.category || '')
+   230→   230→    setEditDialogOpen(true)
+   231→   231→  }
+   232→   232→
+   233→   233→  const handleSaveEdit = async () => {
+   234→   234→    if (!editingAlbum || !editAlbumName.trim()) return
+   235→   235→    const ok = await updateAlbum(editingAlbum.id, {
+   236→   236→      name: editAlbumName.trim(),
+   237→   237→      description: editAlbumDesc.trim() || undefined,
+   238→   238→      category: editAlbumCategory.trim() || undefined,
+   239→   239→    })
+   240→   240→    if (ok) {
+   241→   241→      setEditDialogOpen(false)
+   242→   242→      setEditingAlbum(null)
+   243→   243→    }
+   244→   244→  }
+   245→   245→
+   246→   246→  const handleUpload = async () => {
+   247→   247→    if (!selectedAlbum || selectedFiles.length === 0 || !imgbbApiKey.trim()) return
+   248→   248→    localStorage.setItem('imgbb_api_key', imgbbApiKey.trim())
+   249→   249→    const ok = await uploadPhotos(selectedAlbum.id, selectedFiles, imgbbApiKey.trim())
+   250→   250→    if (ok) {
+   251→   251→      handleClearFiles()
+   252→   252→      setUploadDialogOpen(false)
+   253→   253→    }
+   254→   254→  }
+   255→   255→
+   256→   256→  const handleAddVideo = async () => {
+   257→   257→    if (!selectedAlbum || !videoTitle.trim() || !videoUrl.trim()) return
+   258→   258→    const ok = await addVideo(selectedAlbum.id, videoTitle.trim(), videoUrl.trim())
+   259→   259→    if (ok) {
+   260→   260→      setVideoTitle('')
+   261→   261→      setVideoUrl('')
+   262→   262→      setVideoDialogOpen(false)
+   263→   263→    }
+   264→   264→  }
+   265→   265→
+   266→   266→  const handleOpenAlbum = (album: Album) => {
+   267→   267→    setView('items', album.id)
+   268→   268→  }
+   269→   269→
+   270→   270→  const handleBack = () => {
+   271→   271→    setView('albums')
+   272→   272→  }
+   273→   273→
+   274→   274→  const handleDeleteAlbum = async (album: Album) => {
+   275→   275→    await deleteAlbum(album.id)
+   276→   276→    if (selectedAlbum?.id === album.id) {
+   277→   277→      setView('albums')
+   278→   278→    }
+   279→   279→  }
+   280→   280→
+   281→   281→  const currentLightboxItem = lightbox.items[lightbox.currentIndex]
+   282→   282→
+   283→   283→  // ==================== RENDER ====================
+   284→   284→
+   285→   285→  return (
+   286→   286→    <div className="min-h-screen flex flex-col bg-background">
+   287→   287→      {/* HEADER */}
+   288→   288→      <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-md border-b">
+   289→   289→        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+   290→   290→          <div className="flex items-center justify-between h-16">
+   291→   291→            <h1 className="text-xl font-bold tracking-tight">Album Koleksi</h1>
+   292→   292→            {view === 'albums' ? (
+   293→   293→              <Button onClick={() => setCreateDialogOpen(true)} size="sm">
+   294→   294→                <Plus className="h-4 w-4 mr-1.5" /> Buat Album
+   295→   295→              </Button>
+   296→   296→            ) : (
+   297→   297→              <div className="flex gap-2">
+   298→   298→                <Button variant="outline" size="sm" onClick={() => setVideoDialogOpen(true)}>
+   299→   299→                  <Video className="h-4 w-4 mr-1.5" /> Tambah Video
+   300→   300→                </Button>
+   301→   301→                <Button size="sm" onClick={() => setUploadDialogOpen(true)}>
+   302→   302→                  <Upload className="h-4 w-4 mr-1.5" /> Upload Foto
+   303→   303→                </Button>
+   304→   304→              </div>
+   305→   305→            )}
+   306→   306→          </div>
+   307→   307→
+   308→   308→          {/* SEARCH + FILTER BAR (only on albums view) */}
+   309→   309→          {view === 'albums' && (
+   310→   310→            <div className="flex flex-col sm:flex-row gap-3 pb-3">
+   311→   311→              <div className="relative flex-1">
+   312→   312→                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+   313→   313→                <Input
+   314→   314→                  placeholder="Cari album..."
+   315→   315→                  value={searchQuery}
+   316→   316→                  onChange={(e) => setSearch(e.target.value)}
+   317→   317→                  className="pl-9"
+   318→   318→                />
+   319→   319→              </div>
+   320→   320→              <Select value={searchCategory} onValueChange={(v) => setFilterCategory(v === '__all__' ? '' : v)}>
+   321→   321→                <SelectTrigger className="w-full sm:w-48">
+   322→   322→                  <SelectValue placeholder="Semua Kategori" />
+   323→   323→                </SelectTrigger>
+   324→   324→                <SelectContent>
+   325→   325→                  <SelectItem value="__all__">Semua Kategori</SelectItem>
+   326→   326→                  {categories.map((cat) => (
+   327→   327→                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+   328→   328→                  ))}
+   329→   329→                </SelectContent>
+   330→   330→              </Select>
+   331→   331→            </div>
+   332→   332→          )}
+   333→   333→        </div>
+   334→   334→      </header>
+   335→   335→
+   336→   336→      {/* MAIN */}
+   337→   337→      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
+   338→   338→        <AnimatePresence mode="wait">
+   339→   339→          {view === 'albums' ? (
+   340→   340→            <motion.div
+   341→   341→              key="albums"
+   342→   342→              variants={pageVariants}
+   343→   343→              initial="initial"
+   344→   344→              animate="animate"
+   345→   345→              exit="exit"
+   346→   346→            >
+   347→   347→              {loading && albums.length === 0 ? (
+   348→   348→                <div className="flex items-center justify-center py-20">
+   349→   349→                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+   350→   350→                </div>
+   351→   351→              ) : albums.length === 0 ? (
+   352→   352→                <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+   353→   353→                  <FolderOpen className="h-16 w-16 mb-4 opacity-40" />
+   354→   354→                  <p className="text-lg font-medium">Belum ada album</p>
+   355→   355→                  <p className="text-sm mt-1">Klik &quot;Buat Album&quot; untuk memulai</p>
+   356→   356→                </div>
+   357→   357→              ) : (
+   358→   358→                <motion.div
+   359→   359→                  className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6"
+   360→   360→                  variants={staggerContainer}
+   361→   361→                  initial="initial"
+   362→   362→                  animate="animate"
+   363→   363→                >
+   364→   364→                  {albums.map((album) => (
+   365→   365→                    <AlbumCard
+   366→   366→                      key={album.id}
+   367→   367→                      album={album}
+   368→   368→                      onClick={() => handleOpenAlbum(album)}
+   369→   369→                      onEdit={() => handleEditAlbum(album)}
+   370→   370→                      onDelete={() => handleDeleteAlbum(album)}
+   371→   371→                    />
+   372→   372→                  ))}
+   373→   373→                </motion.div>
+   374→   374→              )}
+   375→   375→            </motion.div>
+   376→   376→          ) : (
+   377→   377→            <motion.div
+   378→   378→              key="items"
+   379→   379→              variants={pageVariants}
+   380→   380→              initial="initial"
+   381→   381→              animate="animate"
+   382→   382→              exit="exit"
+   383→   383→            >
+   384→   384→              {/* Album header */}
+   385→   385→              <div className="flex items-center gap-3 mb-4">
+   386→   386→                <Button variant="ghost" size="icon" onClick={handleBack}>
+   387→   387→                  <ArrowLeft className="h-5 w-5" />
+   388→   388→                </Button>
+   389→   389→                <div className="flex-1 min-w-0">
+   390→   390→                  <h2 className="text-xl font-bold truncate">{selectedAlbum?.name}</h2>
+   391→   391→                  <p className="text-sm text-muted-foreground">
+   392→   392→                    {selectedAlbum?._count.total ?? 0} item
+   393→   393→                    {selectedAlbum?.category && (
+   394→   394→                      <Badge variant="secondary" className="ml-2 text-xs">
+   395→   395→                        <Tag className="h-3 w-3 mr-1" />{selectedAlbum.category}
+   396→   396→                      </Badge>
+   397→   397→                    )}
+   398→   398→                  </p>
+   399→   399→                </div>
+   400→   400→              </div>
+   401→   401→
+   402→   402→              {/* View mode toolbar */}
+   403→   403→              <div className="flex items-center gap-1.5 mb-5 p-1 bg-muted rounded-lg w-fit">
+   404→   404→                <TooltipButton
+   405→   405→                  icon={<LayoutGrid className="h-4 w-4" />}
+   406→   406→                  label="Grid"
+   407→   407→                  active={viewMode === 'grid'}
+   408→   408→                  onClick={() => setViewMode('grid')}
+   409→   409→                />
+   410→   410→                <TooltipButton
+   411→   411→                  icon={<Rows3 className="h-4 w-4" />}
+   412→   412→                  label="Scroll"
+   413→   413→                  active={viewMode === 'list'}
+   414→   414→                  onClick={() => setViewMode('list')}
+   415→   415→                />
+   416→   416→                <TooltipButton
+   417→   417→                  icon={<ArrowRightLeft className="h-4 w-4" />}
+   418→   418→                  label="Horizontal"
+   419→   419→                  active={viewMode === 'horizontal'}
+   420→   420→                  onClick={() => setViewMode('horizontal')}
+   421→   421→                />
+   422→   422→                {viewMode === 'grid' && (
+   423→   423→                  <div className="w-px h-6 bg-border mx-1" />
+   424→   424→                )}
+   425→   425→                {viewMode === 'grid' && (
+   426→   426→                  <Select value={String(gridCols)} onValueChange={(v) => setGridCols(Number(v))}>
+   427→   427→                    <SelectTrigger className="h-8 w-auto min-w-[60px] border-0 bg-transparent shadow-none focus:ring-0 px-2">
+   428→   428→                      <SelectValue />
+   429→   429→                    </SelectTrigger>
+   430→   430→                    <SelectContent>
+   431→   431→                      <SelectItem value="4">4 Kolom</SelectItem>
+   432→   432→                      <SelectItem value="5">5 Kolom</SelectItem>
+   433→   433→                      <SelectItem value="6">6 Kolom</SelectItem>
+   434→   434→                    </SelectContent>
+   435→   435→                  </Select>
+   436→   436→                )}
+   437→   437→              </div>
+   438→   438→
+   439→   439→              {loading && mediaItems.length === 0 ? (
+   440→   440→                <div className="flex items-center justify-center py-20">
+   441→   441→                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+   442→   442→                </div>
+   443→   443→              ) : mediaItems.length === 0 ? (
+   444→   444→                <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+   445→   445→                  <ImageIcon className="h-16 w-16 mb-4 opacity-40" />
+   446→   446→                  <p className="text-lg font-medium">Belum ada konten</p>
+   447→   447→                  <p className="text-sm mt-1">Upload foto atau tambahkan video</p>
+   448→   448→                </div>
+   449→   449→              ) : viewMode === 'horizontal' ? (
+   450→   450→                /* ============ HORIZONTAL SCROLL ============ */
+   451→   451→                <div className="relative -mx-4 sm:-mx-6 lg:-mx-8">
+   452→   452→                  <div className="flex gap-4 overflow-x-auto px-4 sm:px-6 lg:px-8 pb-4 snap-x snap-mandatory scrollbar-hide">
+   453→   453→                    {mediaItems.map((item, index) => (
+   454→   454→                      <motion.div
+   455→   455→                        key={item.type === 'photo' ? item.data.id : item.data.id}
+   456→   456→                        variants={cardVariants}
+   457→   457→                        className="snap-start shrink-0 w-[280px] sm:w-[320px]"
+   458→   458→                      >
+   459→   459→                        <MediaCard
+   460→   460→                          item={item}
+   461→   461→                          index={index}
+   462→   462→                          onClick={() => openLightbox(mediaItems, index)}
+   463→   463→                          onDelete={() => {
+   464→   464→                            if (item.type === 'photo') deletePhoto(item.data.id)
+   465→   465→                            else deleteVideo(item.data.id)
+   466→   466→                          }}
+   467→   467→                          className="aspect-[4/3]"
+   468→   468→                        />
+   469→   469→                      </motion.div>
+   470→   470→                    ))}
+   471→   471→                  </div>
+   472→   472→                </div>
+   473→   473→              ) : viewMode === 'list' ? (
+   474→   474→                /* ============ LIST / VERTICAL SCROLL ============ */
+   475→   475→                <motion.div
+   476→   476→                  className="flex flex-col gap-4"
+   477→   477→                  variants={staggerContainer}
+   478→   478→                  initial="initial"
+   479→   479→                  animate="animate"
+   480→   480→                >
+   481→   481→                  {mediaItems.map((item, index) => (
+   482→   482→                    <motion.div
+   483→   483→                      key={item.type === 'photo' ? item.data.id : item.data.id}
+   484→   484→                      variants={cardVariants}
+   485→   485→                      className="relative group cursor-pointer rounded-xl overflow-hidden"
+   486→   486→                      onClick={() => openLightbox(mediaItems, index)}
+   487→   487→                    >
+   488→   488→                      {item.type === 'video' ? (
+   489→   489→                        <div className="relative w-full aspect-video bg-muted">
+   490→   490→                          {(item.data as Video).thumbnailUrl ? (
+   491→   491→                            <img
+   492→   492→                              src={(item.data as Video).thumbnailUrl!}
+   493→   493→                              alt={(item.data as Video).title}
+   494→   494→                              className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
+   495→   495→                            />
+   496→   496→                          ) : (
+   497→   497→                            <div className="w-full h-full flex items-center justify-center">
+   498→   498→                              <Video className="h-12 w-12 text-muted-foreground/30" />
+   499→   499→                            </div>
+   500→   500→                          )}
+   501→   501→                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+   502→   502→                            <div className="bg-black/50 rounded-full p-3">
+   503→   503→                              <Play className="h-7 w-7 text-white fill-white" />
+   504→   504→                            </div>
+   505→   505→                          </div>
+   506→   506→                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+   507→   507→                          <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/60 to-transparent">
+   508→   508→                            <p className="text-white text-sm font-medium truncate">{(item.data as Video).title}</p>
+   509→   509→                            <p className="text-white/70 text-xs">{formatDate((item.data as Video).createdAt)}</p>
+   510→   510→                          </div>
+   511→   511→                          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+   512→   512→                            <Button
+   513→   513→                              variant="destructive" size="icon" className="h-8 w-8 rounded-full shadow-lg"
+   514→   514→                              onClick={(e) => { e.stopPropagation(); deleteVideo((item.data as Video).id) }}
+   515→   515→                            >
+   516→   516→                              <Trash2 className="h-3.5 w-3.5" />
+   517→   517→                            </Button>
+   518→   518→                          </div>
+   519→   519→                        </div>
+   520→   520→                      ) : (
+   521→   521→                        <div className="relative w-full bg-muted">
+   522→   522→                          <img
+   523→   523→                            src={(item.data as Photo).thumbnailUrl || (item.data as Photo).url}
+   524→   524→                            alt={(item.data as Photo).filename}
+   525→   525→                            className="w-full max-h-[70vh] object-contain group-hover:scale-[1.01] transition-transform duration-300"
+   526→   526→                          />
+   527→   527→                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+   528→   528→                          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+   529→   529→                            <Button
+   530→   530→                              variant="destructive" size="icon" className="h-8 w-8 rounded-full shadow-lg"
+   531→   531→                              onClick={(e) => { e.stopPropagation(); deletePhoto((item.data as Photo).id) }}
+   532→   532→                            >
+   533→   533→                              <Trash2 className="h-3.5 w-3.5" />
+   534→   534→                            </Button>
+   535→   535→                          </div>
+   536→   536→                        </div>
+   537→   537→                      )}
+   538→   538→                    </motion.div>
+   539→   539→                  ))}
+   540→   540→                </motion.div>
+   541→   541→              ) : (
+   542→   542→                /* ============ GRID VIEW ============ */
+   543→   543→                <motion.div
+   544→   544→                  className={`grid grid-cols-2 sm:grid-cols-3 ${gridCols === 5 ? 'lg:grid-cols-5' : gridCols === 6 ? 'lg:grid-cols-6' : 'lg:grid-cols-4'} gap-4 sm:gap-4`}
+   545→   545→                  variants={staggerContainer}
+   546→   546→                  initial="initial"
+   547→   547→                  animate="animate"
+   548→   548→                >
+   549→   549→                  {mediaItems.map((item, index) => (
+   550→   550→                    <MediaCard
+   551→   551→                      key={item.type === 'photo' ? item.data.id : item.data.id}
+   552→   552→                      item={item}
+   553→   553→                      index={index}
+   554→   554→                      onClick={() => openLightbox(mediaItems, index)}
+   555→   555→                      onDelete={() => {
+   556→   556→                        if (item.type === 'photo') deletePhoto(item.data.id)
+   557→   557→                        else deleteVideo(item.data.id)
+   558→   558→                      }}
+   559→   559→                    />
+   560→   560→                  ))}
+   561→   561→                </motion.div>
+   562→   562→              )}
+   563→   563→            </motion.div>
+   564→   564→          )}
+   565→   565→        </AnimatePresence>
+   566→   566→      </main>
+   567→   567→
+   568→   568→      {/* FOOTER */}
+   569→   569→      <footer className="border-t py-4 mt-auto">
+   570→   570→        <p className="text-center text-xs text-muted-foreground">
+   571→   571→          Album Koleksi &mdash; Next.js + Prisma + ImgBB
+   572→   572→        </p>
+   573→   573→      </footer>
+   574→   574→
+   575→   575→      {/* ====== DIALOGS ====== */}
+   576→   576→
+   577→   577→      {/* Create Album */}
+   578→   578→      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+   579→   579→        <DialogContent>
+   580→   580→          <DialogHeader>
+   581→   581→            <DialogTitle>Buat Album Baru</DialogTitle>
+   582→   582→            <DialogDescription>Isi detail album yang ingin dibuat</DialogDescription>
+   583→   583→          </DialogHeader>
+   584→   584→          <div className="space-y-4 py-2">
+   585→   585→            <div>
+   586→   586→              <Label htmlFor="create-name">Nama Album *</Label>
+   587→   587→              <Input
+   588→   588→                id="create-name"
+   589→   589→                value={newAlbumName}
+   590→   590→                onChange={(e) => setNewAlbumName(e.target.value)}
+   591→   591→                placeholder="Contoh: Liburan Bali 2025"
+   592→   592→              />
+   593→   593→            </div>
+   594→   594→            <div>
+   595→   595→              <Label htmlFor="create-category">Kategori</Label>
+   596→   596→              <Input
+   597→   597→                id="create-category"
+   598→   598→                value={newAlbumCategory}
+   599→   599→                onChange={(e) => setNewAlbumCategory(e.target.value)}
+   600→   600→                placeholder="Contoh: Pribadi, Proyek, Event"
+   601→   601→                list="category-suggestions"
+   602→   602→              />
+   603→   603→              <datalist id="category-suggestions">
+   604→   604→                {categories.map((c) => (
+   605→   605→                  <option key={c} value={c} />
+   606→   606→                ))}
+   607→   607→              </datalist>
+   608→   608→            </div>
+   609→   609→            <div>
+   610→   610→              <Label htmlFor="create-desc">Deskripsi</Label>
+   611→   611→              <Textarea
+   612→   612→                id="create-desc"
+   613→   613→                value={newAlbumDesc}
+   614→   614→                onChange={(e) => setNewAlbumDesc(e.target.value)}
+   615→   615→                placeholder="Opsional"
+   616→   616→                rows={3}
+   617→   617→              />
+   618→   618→            </div>
+   619→   619→          </div>
+   620→   620→          <DialogFooter>
+   621→   621→            <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>Batal</Button>
+   622→   622→            <Button onClick={handleCreateAlbum} disabled={!newAlbumName.trim()}>Buat</Button>
+   623→   623→          </DialogFooter>
+   624→   624→        </DialogContent>
+   625→   625→      </Dialog>
+   626→   626→
+   627→   627→      {/* Edit Album */}
+   628→   628→      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+   629→   629→        <DialogContent>
+   630→   630→          <DialogHeader>
+   631→   631→            <DialogTitle>Edit Album</DialogTitle>
+   632→   632→            <DialogDescription>Ubah detail album</DialogDescription>
+   633→   633→          </DialogHeader>
+   634→   634→          <div className="space-y-4 py-2">
+   635→   635→            <div>
+   636→   636→              <Label htmlFor="edit-name">Nama Album *</Label>
+   637→   637→              <Input
+   638→   638→                id="edit-name"
+   639→   639→                value={editAlbumName}
+   640→   640→                onChange={(e) => setEditAlbumName(e.target.value)}
+   641→   641→              />
+   642→   642→            </div>
+   643→   643→            <div>
+   644→   644→              <Label htmlFor="edit-category">Kategori</Label>
+   645→   645→              <Input
+   646→   646→                id="edit-category"
+   647→   647→                value={editAlbumCategory}
+   648→   648→                onChange={(e) => setEditAlbumCategory(e.target.value)}
+   649→   649→                list="category-suggestions-edit"
+   650→   650→              />
+   651→   651→              <datalist id="category-suggestions-edit">
+   652→   652→                {categories.map((c) => (
+   653→   653→                  <option key={c} value={c} />
+   654→   654→                ))}
+   655→   655→              </datalist>
+   656→   656→            </div>
+   657→   657→            <div>
+   658→   658→              <Label htmlFor="edit-desc">Deskripsi</Label>
+   659→   659→              <Textarea
+   660→   660→                id="edit-desc"
+   661→   661→                value={editAlbumDesc}
+   662→   662→                onChange={(e) => setEditAlbumDesc(e.target.value)}
+   663→   663→                rows={3}
+   664→   664→              />
+   665→   665→            </div>
+   666→   666→          </div>
+   667→   667→          <DialogFooter>
+   668→   668→            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>Batal</Button>
+   669→   669→            <Button onClick={handleSaveEdit} disabled={!editAlbumName.trim()}>Simpan</Button>
+   670→   670→          </DialogFooter>
+   671→   671→        </DialogContent>
+   672→   672→      </Dialog>
+   673→   673→
+   674→   674→      {/* Upload Photos (ImgBB only) */}
+   675→   675→      <Dialog open={uploadDialogOpen} onOpenChange={(open) => {
+   676→   676→        if (!open) handleClearFiles()
+   677→   677→        setUploadDialogOpen(open)
+   678→   678→      }}>
+   679→   679→        <DialogContent className="max-w-lg">
+   680→   680→          <DialogHeader>
+   681→   681→            <DialogTitle>Upload Foto via ImgBB</DialogTitle>
+   682→   682→            <DialogDescription>
+   683→   683→              Foto akan diupload ke ImgBB. Pastikan API key sudah terisi.
+   684→   684→            </DialogDescription>
+   685→   685→          </DialogHeader>
+   686→   686→          <div className="space-y-4 py-2">
+   687→   687→            {/* API Key */}
+   688→   688→            <div>
+   689→   689→              <Label htmlFor="imgbb-key">ImgBB API Key *</Label>
+   690→   690→              <div className="relative mt-1">
+   691→   691→                <Input
+   692→   692→                  id="imgbb-key"
+   693→   693→                  type={showApiKey ? 'text' : 'password'}
+   694→   694→                  value={imgbbApiKey}
+   695→   695→                  onChange={(e) => setImgbbApiKey(e.target.value)}
+   696→   696→                  placeholder="Masukkan API key ImgBB"
+   697→   697→                />
+   698→   698→                <Button
+   699→   699→                  type="button"
+   700→   700→                  variant="ghost"
+   701→   701→                  size="icon"
+   702→   702→                  className="absolute right-0 top-0 h-full px-3"
+   703→   703→                  onClick={() => setShowApiKey(!showApiKey)}
+   704→   704→                >
+   705→   705→                  {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+   706→   706→                </Button>
+   707→   707→              </div>
+   708→   708→              <p className="text-xs text-muted-foreground mt-1">
+   709→   709→                Daftar gratis di{' '}
+   710→   710→                <a href="https://api.imgbb.com/" target="_blank" rel="noreferrer" className="underline">
+   711→   711→                  api.imgbb.com
+   712→   712→                </a>
+   713→   713→              </p>
+   714→   714→            </div>
+   715→   715→
+   716→   716→            {/* Drop Zone */}
+   717→   717→            <div>
+   718→   718→              <Label>Pilih Foto</Label>
+   719→   719→              <div
+   720→   720→                className={`mt-1 border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${isDragOver ? 'border-emerald-500 bg-emerald-50' : 'border-muted-foreground/25 hover:border-muted-foreground/50'}`}
+   721→   721→                onClick={() => fileInputRef.current?.click()}
+   722→   722→                onDragOver={(e) => { e.preventDefault(); setIsDragOver(true) }}
+   723→   723→                onDragLeave={() => setIsDragOver(false)}
+   724→   724→                onDrop={(e) => { e.preventDefault(); setIsDragOver(false); handleFiles(e.dataTransfer.files) }}
+   725→   725→              >
+   726→   726→                <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+   727→   727→                <p className="text-sm text-muted-foreground">
+   728→   728→                  Drag & drop foto ke sini, atau <span className="text-emerald-600 font-medium">klik untuk pilih</span>
+   729→   729→                </p>
+   730→   730→                <p className="text-xs text-muted-foreground mt-1">PNG, JPG, GIF, WEBP</p>
+   731→   731→              </div>
+   732→   732→              <input
+   733→   733→                ref={fileInputRef}
+   734→   734→                type="file"
+   735→   735→                multiple
+   736→   736→                accept="image/*"
+   737→   737→                className="hidden"
+   738→   738→                onChange={(e) => handleFiles(e.target.files)}
+   739→   739→              />
+   740→   740→            </div>
+   741→   741→
+   742→   742→            {/* Previews */}
+   743→   743→            {previews.length > 0 && (
+   744→   744→              <div>
+   745→   745→                <div className="flex items-center justify-between mb-2">
+   746→   746→                  <Label>{selectedFiles.length} file dipilih</Label>
+   747→   747→                  <Button variant="ghost" size="sm" onClick={handleClearFiles}>
+   748→   748→                    <X className="h-3.5 w-3.5 mr-1" /> Hapus Semua
+   749→   749→                  </Button>
+   750→   750→                </div>
+   751→   751→                <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto">
+   752→   752→                  {previews.map((src, i) => (
+   753→   753→                    <div key={i} className="relative aspect-square rounded-md overflow-hidden group">
+   754→   754→                      <img src={src} alt="" className="w-full h-full object-cover" />
+   755→   755→                      <button
+   756→   756→                        onClick={(e) => { e.stopPropagation(); handleRemoveFile(i) }}
+   757→   757→                        className="absolute top-0.5 right-0.5 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+   758→   758→                      >
+   759→   759→                        <X className="h-3 w-3" />
+   760→   760→                      </button>
+   761→   761→                    </div>
+   762→   762→                  ))}
+   763→   763→                </div>
+   764→   764→              </div>
+   765→   765→            )}
+   766→   766→
+   767→   767→            {/* Progress */}
+   768→   768→            {uploading && (
+   769→   769→              <div className="space-y-1">
+   770→   770→                <p className="text-sm text-muted-foreground">Mengunggah...</p>
+   771→   771→                <Progress value={uploadProgress} className="h-2" />
+   772→   772→              </div>
+   773→   773→            )}
+   774→   774→          </div>
+   775→   775→          <DialogFooter>
+   776→   776→            <Button variant="outline" onClick={() => { handleClearFiles(); setUploadDialogOpen(false) }}>Batal</Button>
+   777→   777→            <Button
+   778→   778→              onClick={handleUpload}
+   779→   779→              disabled={uploading || selectedFiles.length === 0 || !imgbbApiKey.trim()}
+   780→   780→            >
+   781→   781→              {uploading && <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />}
+   782→   782→              Upload {selectedFiles.length > 0 ? `(${selectedFiles.length})` : ''}
+   783→   783→            </Button>
+   784→   784→          </DialogFooter>
+   785→   785→        </DialogContent>
+   786→   786→      </Dialog>
+   787→   787→
+   788→   788→      {/* Add Video */}
+   789→   789→      <Dialog open={videoDialogOpen} onOpenChange={setVideoDialogOpen}>
+   790→   790→        <DialogContent>
+   791→   791→          <DialogHeader>
+   792→   792→            <DialogTitle>Tambah Video</DialogTitle>
+   793→   793→            <DialogDescription>
+   794→   794→              Paste link YouTube, Vimeo, atau URL embed video lainnya
+   795→   795→            </DialogDescription>
+   796→   796→          </DialogHeader>
+   797→   797→          <div className="space-y-4 py-2">
+   798→   798→            <div>
+   799→   799→              <Label htmlFor="video-title">Judul Video *</Label>
+   800→   800→              <Input
+   801→   801→                id="video-title"
+   802→   802→                value={videoTitle}
+   803→   803→                onChange={(e) => setVideoTitle(e.target.value)}
+   804→   804→                placeholder="Contoh: Behind the scene"
+   805→   805→              />
+   806→   806→            </div>
+   807→   807→            <div>
+   808→   808→              <Label htmlFor="video-url">URL Video *</Label>
+   809→   809→              <Input
+   810→   810→                id="video-url"
+   811→   811→                value={videoUrl}
+   812→   812→                onChange={(e) => setVideoUrl(e.target.value)}
+   813→   813→                placeholder="https://www.youtube.com/watch?v=... atau https://youtu.be/..."
+   814→   814→              />
+   815→   815→              <p className="text-xs text-muted-foreground mt-1">
+   816→   816→                Mendukung YouTube &amp; Vimeo. Link otomatis dikonversi ke embed.
+   817→   817→              </p>
+   818→   818→            </div>
+   819→   819→          </div>
+   820→   820→          <DialogFooter>
+   821→   821→            <Button variant="outline" onClick={() => setVideoDialogOpen(false)}>Batal</Button>
+   822→   822→            <Button onClick={handleAddVideo} disabled={!videoTitle.trim() || !videoUrl.trim()}>
+   823→   823→              Tambah
+   824→   824→            </Button>
+   825→   825→          </DialogFooter>
+   826→   826→        </DialogContent>
+   827→   827→      </Dialog>
+   828→   828→
+   829→   829→      {/* ====== LIGHTBOX ====== */}
+   830→   830→      <AnimatePresence>
+   831→   831→        {lightbox.open && currentLightboxItem && (
+   832→   832→          <motion.div
+   833→   833→            className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
+   834→   834→            initial={{ opacity: 0 }}
+   835→   835→            animate={{ opacity: 1 }}
+   836→   836→            exit={{ opacity: 0 }}
+   837→   837→            onClick={closeLightbox}
+   838→   838→          >
+   839→   839→            {/* Close button */}
+   840→   840→            <button
+   841→   841→              onClick={closeLightbox}
+   842→   842→              className="absolute top-4 right-4 text-white/80 hover:text-white z-10"
+   843→   843→            >
+   844→   844→              <X className="h-8 w-8" />
+   845→   845→            </button>
+   846→   846→
+   847→   847→            {/* Counter */}
+   848→   848→            <div className="absolute top-4 left-4 text-white/70 text-sm">
+   849→   849→              {lightbox.currentIndex + 1} / {lightbox.items.length}
+   850→   850→            </div>
+   851→   851→
+   852→   852→            {/* Prev */}
+   853→   853→            {lightbox.items.length > 1 && (
+   854→   854→              <button
+   855→   855→                onClick={(e) => { e.stopPropagation(); prevItem() }}
+   856→   856→                className="absolute left-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white z-10"
+   857→   857→              >
+   858→   858→                <ChevronLeft className="h-10 w-10" />
+   859→   859→              </button>
+   860→   860→            )}
+   861→   861→
+   862→   862→            {/* Content */}
+   863→   863→            <motion.div
+   864→   864→              key={lightbox.currentIndex}
+   865→   865→              initial={{ opacity: 0, scale: 0.9 }}
+   866→   866→              animate={{ opacity: 1, scale: 1 }}
+   867→   867→              exit={{ opacity: 0, scale: 0.9 }}
+   868→   868→              transition={{ duration: 0.2 }}
+   869→   869→              className="w-full h-full flex items-center justify-center p-12"
+   870→   870→              onClick={(e) => e.stopPropagation()}
+   871→   871→            >
+   872→   872→              {currentLightboxItem.type === 'photo' ? (
+   873→   873→                <img
+   874→   874→                  src={(currentLightboxItem.data as Photo).thumbnailUrl || (currentLightboxItem.data as Photo).url}
+   875→   875→                  alt=""
+   876→   876→                  className="max-w-full max-h-full object-contain rounded-lg"
+   877→   877→                />
+   878→   878→              ) : (
+   879→   879→                <div className="w-full max-w-4xl aspect-video">
+   880→   880→                  <iframe
+   881→   881→                    src={(currentLightboxItem.data as Video).url}
+   882→   882→                    title={(currentLightboxItem.data as Video).title}
+   883→   883→                    className="w-full h-full rounded-lg"
+   884→   884→                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+   885→   885→                    allowFullScreen
+   886→   886→                  />
+   887→   887→                </div>
+   888→   888→              )}
+   889→   889→            </motion.div>
+   890→   890→
+   891→   891→            {/* Next */}
+   892→   892→            {lightbox.items.length > 1 && (
+   893→   893→              <button
+   894→   894→                onClick={(e) => { e.stopPropagation(); nextItem() }}
+   895→   895→                className="absolute right-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white z-10"
+   896→   896→              >
+   897→   897→                <ChevronRight className="h-10 w-10" />
+   898→   898→              </button>
+   899→   899→            )}
+   900→   900→          </motion.div>
+   901→   901→        )}
+   902→   902→      </AnimatePresence>
+   903→   903→    </div>
+   904→   904→  )
+   905→   905→}
+   906→   906→
+   907→   907→// ==================== SUB-COMPONENTS ====================
+   908→   908→
+   909→   909→function AlbumCard({ album, onClick, onEdit, onDelete }: {
+   910→   910→  album: Album
+   911→   911→  onClick: () => void
+   912→   912→  onEdit: () => void
+   913→   913→  onDelete: () => void
+   914→   914→}) {
+   915→   915→  return (
+   916→   916→    <motion.div variants={cardVariants} layout>
+   917→   917→      <Card
+   918→   918→        className="group cursor-pointer overflow-hidden hover:shadow-lg transition-shadow"
+   919→   919→        onClick={onClick}
+   920→   920→      >
+   921→   921→        <div className="relative aspect-[4/3] overflow-hidden bg-muted">
+   922→   922→          {album.coverUrl ? (
+   923→   923→            <img
+   924→   924→              src={album.coverUrl}
+   925→   925→              alt={album.name}
+   926→   926→              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+   927→   927→            />
+   928→   928→          ) : (
+   929→   929→            <div className="w-full h-full flex items-center justify-center">
+   930→   930→              <ImageIcon className="h-12 w-12 text-muted-foreground/30" />
+   931→   931→            </div>
+   932→   932→          )}
+   933→   933→          {/* Actions overlay */}
+   934→   934→          <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+   935→   935→            <Button
+   936→   936→              variant="secondary" size="icon" className="h-8 w-8 rounded-full shadow"
+   937→   937→              onClick={(e) => { e.stopPropagation(); onEdit() }}
+   938→   938→            >
+   939→   939→              <Pencil className="h-3.5 w-3.5" />
+   940→   940→            </Button>
+   941→   941→            <Button
+   942→   942→              variant="destructive" size="icon" className="h-8 w-8 rounded-full shadow"
+   943→   943→              onClick={(e) => { e.stopPropagation(); onDelete() }}
+   944→   944→            >
+   945→   945→              <Trash2 className="h-3.5 w-3.5" />
+   946→   946→            </Button>
+   947→   947→          </div>
+   948→   948→        </div>
+   949→   949→        <CardContent className="p-3 sm:p-4">
+   950→   950→          <h3 className="font-semibold text-sm sm:text-base truncate">{album.name}</h3>
+   951→   951→          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+   952→   952→            {album.category && (
+   953→   953→              <Badge variant="secondary" className="text-xs gap-1">
+   954→   954→                <Tag className="h-3 w-3" />{album.category}
+   955→   955→              </Badge>
+   956→   956→            )}
+   957→   957→            <span className="text-xs text-muted-foreground">
+   958→   958→              {album._count.total} item
+   959→   959→            </span>
+   960→   960→            <span className="text-xs text-muted-foreground">
+   961→   961→              {formatDate(album.createdAt)}
+   962→   962→            </span>
+   963→   963→          </div>
+   964→   964→        </CardContent>
+   965→   965→      </Card>
+   966→   966→    </motion.div>
+   967→   967→  )
+   968→   968→}
+   969→   969→
+   970→   970→function TooltipButton({ icon, label, active, onClick }: {
+   971→   971→  icon: React.ReactNode
+   972→   972→  label: string
+   973→   973→  active: boolean
+   974→   974→  onClick: () => void
+   975→   975→}) {
+   976→   976→  return (
+   977→   977→    <button
+   978→   978→      onClick={onClick}
+   979→   979→      title={label}
+   980→   980→      className={`flex items-center justify-center h-8 px-2.5 rounded-md text-sm font-medium transition-colors ${
+   981→   981→        active
+   982→   982→          ? 'bg-background shadow-sm text-foreground'
+   983→   983→          : 'text-muted-foreground hover:text-foreground'
+   984→   984→      }`}
+   985→   985→    >
+   986→   986→      {icon}
+   987→   987→    </button>
+   988→   988→  )
+   989→   989→}
+   990→   990→
+   991→   991→function MediaCard({ item, index, onClick, onDelete, className }: {
+   992→   992→  item: MediaItem
+   993→   993→  index: number
+   994→   994→  onClick: () => void
+   995→   995→  onDelete: () => void
+   996→   996→  className?: string
+   997→   997→}) {
+   998→   998→  const isVideo = item.type === 'video'
+   999→   999→  const src = isVideo
+  1000→  1000→    ? (item.data as Video).thumbnailUrl || ''
+  1001→  1001→    : (item.data as Photo).thumbnailUrl || (item.data as Photo).url
+  1002→  1002→  const title = isVideo
+  1003→  1003→    ? (item.data as Video).title
+  1004→  1004→    : (item.data as Photo).filename
+  1005→  1005→
+  1006→  1006→  return (
+  1007→  1007→    <motion.div
+  1008→  1008→      variants={cardVariants}
+  1009→  1009→      layout
+  1010→  1010→      className={`relative ${className || 'aspect-square'} rounded-xl overflow-hidden group cursor-pointer`}
+  1011→  1011→      onClick={onClick}
+  1012→  1012→    >
+  1013→  1013→      {src ? (
+  1014→  1014→        <img
+  1015→  1015→          src={src}
+  1016→  1016→          alt={title}
+  1017→  1017→          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+  1018→  1018→        />
+  1019→  1019→      ) : (
+  1020→  1020→        <div className="w-full h-full bg-muted flex items-center justify-center">
+  1021→  1021→          {isVideo ? (
+  1022→  1022→            <Video className="h-10 w-10 text-muted-foreground/40" />
+  1023→  1023→          ) : (
+  1024→  1024→            <ImageIcon className="h-10 w-10 text-muted-foreground/40" />
+  1025→  1025→          )}
+  1026→  1026→        </div>
+  1027→  1027→      )}
+  1028→  1028→
+  1029→  1029→      {/* Video play icon */}
+  1030→  1030→      {isVideo && (
+  1031→  1031→        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+  1032→  1032→          <div className="bg-black/50 rounded-full p-3">
+  1033→  1033→            <Play className="h-8 w-8 text-white fill-white" />
+  1034→  1034→          </div>
+  1035→  1035→        </div>
+  1036→  1036→      )}
+  1037→  1037→
+  1038→  1038→      {/* Delete overlay */}
+  1039→  1039→      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors">
+  1040→  1040→        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+  1041→  1041→          <Button
+  1042→  1042→            variant="destructive" size="icon" className="h-8 w-8 rounded-full shadow-lg"
+  1043→  1043→            onClick={(e) => { e.stopPropagation(); onDelete() }}
+  1044→  1044→          >
+  1045→  1045→            <Trash2 className="h-3.5 w-3.5" />
+  1046→  1046→          </Button>
+  1047→  1047→        </div>
+  1048→  1048→      </div>
+  1049→  1049→    </motion.div>
+  1050→  1050→  )
+  1051→  1051→}
+  1052→  1052→
