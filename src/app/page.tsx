@@ -464,7 +464,6 @@ export default function Home() {
                             if (item.type === 'photo') deletePhoto(item.data.id)
                             else deleteVideo(item.data.id)
                           }}
-                          className="aspect-[4/3]"
                         />
                       </motion.div>
                     ))}
@@ -518,13 +517,13 @@ export default function Home() {
                           </div>
                         </div>
                       ) : (
-                        <div className="relative w-full bg-muted">
+                        <div className="relative w-full">
                           <img
                             src={(item.data as Photo).url}
                             alt={(item.data as Photo).filename}
-                            className="w-full max-h-[70vh] object-contain group-hover:scale-[1.01] transition-transform duration-300"
+                            className="w-full h-auto block rounded-xl"
                           />
-                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-xl" />
                           <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <Button
                               variant="destructive" size="icon" className="h-8 w-8 rounded-full shadow-lg"
@@ -1007,17 +1006,17 @@ function MediaCard({ item, index, onClick, onDelete, className }: {
     <motion.div
       variants={cardVariants}
       layout
-      className={`relative ${className || 'aspect-square'} rounded-xl overflow-hidden group cursor-pointer bg-muted`}
+      className={`relative rounded-xl overflow-hidden group cursor-pointer ${className || ''}`}
       onClick={onClick}
     >
       {src ? (
         <img
           src={src}
           alt={title}
-          className="w-full h-full object-contain"
+          className="w-full h-auto block"
         />
       ) : (
-        <div className="w-full h-full bg-muted flex items-center justify-center">
+        <div className="w-full aspect-square bg-muted flex items-center justify-center">
           {isVideo ? (
             <Video className="h-10 w-10 text-muted-foreground/40" />
           ) : (
@@ -1027,7 +1026,7 @@ function MediaCard({ item, index, onClick, onDelete, className }: {
       )}
 
       {/* Video play icon */}
-      {isVideo && (
+      {isVideo && src && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="bg-black/50 rounded-full p-3">
             <Play className="h-8 w-8 text-white fill-white" />
@@ -1036,16 +1035,18 @@ function MediaCard({ item, index, onClick, onDelete, className }: {
       )}
 
       {/* Delete overlay */}
-      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors">
-        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Button
-            variant="destructive" size="icon" className="h-8 w-8 rounded-full shadow-lg"
-            onClick={(e) => { e.stopPropagation(); onDelete() }}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
+      {src && (
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors">
+          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button
+              variant="destructive" size="icon" className="h-8 w-8 rounded-full shadow-lg"
+              onClick={(e) => { e.stopPropagation(); onDelete() }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
     </motion.div>
   )
 }
