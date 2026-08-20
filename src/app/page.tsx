@@ -255,7 +255,27 @@ export default function Home() {
 
   const handleAddVideo = async () => {
     if (!selectedAlbum || !videoTitle.trim() || !videoUrl.trim()) return
-    const ok = await addVideo(selectedAlbum.id, videoTitle.trim(), videoUrl.trim())
+
+    let detectedThumbnail: string | undefined = undefined
+
+    // Deteksi jika link merupakan TurboVid atau player berbasis JW Player (.jw-preview)
+    if (videoUrl.includes('turbovid') || videoUrl.includes('jwplayer')) {
+      // Jika ada pola ID video di URL, kita rakit link thumbnail bawaannya
+      const match = videoUrl.match(/\/(?:v|embed|e)\/([a-zA-Z0-9]+)/)
+      if (match && match[1]) {
+        // Kebanyakan CDN TurboVid/JWPlayer menyimpan preview di struktur gambar berikut:
+        detectedThumbnail = `https://turbovid.eu/images/${match[1]}.jpg` 
+      }
+    }
+
+    // Panggil fungsi addVideo dari store (pastikan store menerima thumbnailUrl jika ada)
+    const ok = await addVideo(
+      selectedAlbum.id, 
+      videoTitle.trim(), 
+      videoUrl.trim(),
+      detectedThumbnail
+    )
+
     if (ok) {
       setVideoTitle('')
       setVideoUrl('')
@@ -1004,58 +1024,72 @@ function MediaCard({ item, index, onClick, onDelete, className }: {
   className?: string
 }) {
   const isVideo = item.type === 'video'
+  const videoData = isVideo ? (item.data as Video) : null
+
+  // Prioritaskan thumbnailUrl bawaan dari TurboVid / Player (.jw-preview)
   const src = isVideo
-    ? (item.data as Video).thumbnailUrl || ''
+    ? videoData?.thumbnailUrl || ''
     : (item.data as Photo).url
+
   const title = isVideo
-    ? (item.data as Video).title
+    ? videoData?.title
     : (item.data as Photo).filename
 
   return (
     <motion.div
       variants={cardVariants}
       layout
-      className={`relative rounded-xl overflow-hidden group cursor-pointer ${className || ''}`}
+      className={`relative rounded-xl overflow-hidden group cursor-pointer bg-black/5 ${className || ''}`}
       onClick={onClick}
     >
       {src ? (
-        <img
-          src={src}
-          alt={title}
-          className="w-full h-auto block"
-        />
+        <div className="relative aspect-video w-full overflow-hidden">
+          <img
+            src={src}
+            alt={title}
+            className="jw-preview w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            onError={(e) => {
+              // Jika thumbnail khusus gagal dimuat, hilangkan agar tidak merusak tampilan
+              (e.target as HTMLElement).style.display = 'none'
+            }}
+          />
+          {isVideo && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-black/20">
+              <div className="bg-black/60 rounded-full p-3 backdrop-blur-sm group-hover:scale-110 transition-transform">
+                <Play className="h-7 w-7 text-white fill-white" />
+              </div>
+            </div>
+          )}
+        </div>
       ) : (
-        <div className="w-full aspect-square bg-muted flex items-center justify-center">
+        <div className="w-full aspect-video bg-muted flex flex-col items-center justify-center gap-2">
           {isVideo ? (
-            <Video className="h-10 w-10 text-muted-foreground/40" />
+            <>
+              <Video className="h-10 w-10 text-muted-foreground/40" />
+              <span className="text-xs text-muted-foreground font-medium">{title}</span>
+            </>
           ) : (
             <ImageIcon className="h-10 w-10 text-muted-foreground/40" />
           )}
         </div>
       )}
 
-      {/* Video play icon */}
-      {isVideo && src && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="bg-black/50 rounded-full p-3">
-            <Play className="h-8 w-8 text-white fill-white" />
-          </div>
+      {/* Overlay Hapus */}
+      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors">
+        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button
+            variant="destructive"
+            size="icon"
+            className="h-8 w-8 rounded-full shadow-lg"
+            onClick={(e) => {
+              e.stopPropagation()
+              onDelete()
+            }}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
         </div>
-      )}
-
-      {/* Delete overlay */}
-      {src && (
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors">
-          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Button
-              variant="destructive" size="icon" className="h-8 w-8 rounded-full shadow-lg"
-              onClick={(e) => { e.stopPropagation(); onDelete() }}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        </div>
-      )}
+      </div>
     </motion.div>
   )
 }
