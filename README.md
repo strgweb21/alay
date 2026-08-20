@@ -74,7 +74,7 @@ Ini cara paling gampang buat deploy. Gratis kedua-duanya.
 Di laptop kamu:
 
 ```bash
-git clone https://github.com/USERNAME/album-koleksi.git
+git clone https://github.com/strgweb21/alay.git
 cd album-koleksi
 bun install
 
