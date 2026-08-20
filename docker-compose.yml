@@ -1,16 +1,21 @@
+# ============================================
+# Docker Compose - Pilih salah satu profil
+# ============================================
+# Supabase (direkomendasi):  docker compose --profile supabase up -d
+# SQLite (lokal/offline):     docker compose --profile sqlite up -d
+# ============================================
+
 services:
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "3000:3000"
     environment:
-      - DATABASE_URL=file:/app/db/custom.db
+      - DATABASE_URL=${DATABASE_URL}
       - IMGBB_API_KEY=${IMGBB_API_KEY:-}
-    volumes:
-      - uploads-data:/app/public/uploads
-      - db-data:/app/db
     restart: unless-stopped
 
 volumes:
-  uploads-data:
   db-data:

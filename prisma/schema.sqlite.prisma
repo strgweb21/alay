@@ -2,17 +2,8 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// ============================================
-// DATABASE CONFIGURATION
-// ============================================
-// Lokal (SQLite):   provider = "sqlite",  url = "file:./db/custom.db"
-// Supabase (PostgreSQL): provider = "postgresql", url = env("DATABASE_URL")
-//
-// Ganti provider sesuai environment kamu.
-// ============================================
-
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 

@@ -16,6 +16,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm install -g bun@1 prisma
+# Schema sudah PostgreSQL (default), kalau mau SQLite uncomment baris bawah:
+# RUN cp prisma/schema.sqlite.prisma prisma/schema.prisma
 RUN prisma generate
 RUN bun run build
 
@@ -34,12 +36,6 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
-
-# Create uploads dir
-RUN mkdir -p public/uploads && chown nextjs:nodejs public/uploads
-
-# Create db dir
-RUN mkdir -p db && chown nextjs:nodejs db
 
 USER nextjs
 
