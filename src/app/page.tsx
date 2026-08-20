@@ -1007,14 +1007,14 @@ function MediaCard({ item, index, onClick, onDelete, className }: {
     <motion.div
       variants={cardVariants}
       layout
-      className={`relative ${className || 'aspect-square'} rounded-xl overflow-hidden group cursor-pointer`}
+      className={`relative ${className || 'aspect-square'} rounded-xl overflow-hidden group cursor-pointer bg-muted`}
       onClick={onClick}
     >
       {src ? (
         <img
           src={src}
           alt={title}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          className="w-full h-full object-contain"
         />
       ) : (
         <div className="w-full h-full bg-muted flex items-center justify-center">
