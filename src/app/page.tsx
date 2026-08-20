@@ -520,7 +520,7 @@ export default function Home() {
                       ) : (
                         <div className="relative w-full bg-muted">
                           <img
-                            src={(item.data as Photo).thumbnailUrl || (item.data as Photo).url}
+                            src={(item.data as Photo).url}
                             alt={(item.data as Photo).filename}
                             className="w-full max-h-[70vh] object-contain group-hover:scale-[1.01] transition-transform duration-300"
                           />
@@ -871,7 +871,7 @@ export default function Home() {
             >
               {currentLightboxItem.type === 'photo' ? (
                 <img
-                  src={(currentLightboxItem.data as Photo).thumbnailUrl || (currentLightboxItem.data as Photo).url}
+                  src={(currentLightboxItem.data as Photo).url}
                   alt=""
                   className="max-w-full max-h-full object-contain rounded-lg"
                 />
@@ -998,7 +998,7 @@ function MediaCard({ item, index, onClick, onDelete, className }: {
   const isVideo = item.type === 'video'
   const src = isVideo
     ? (item.data as Video).thumbnailUrl || ''
-    : (item.data as Photo).thumbnailUrl || (item.data as Photo).url
+    : (item.data as Photo).url
   const title = isVideo
     ? (item.data as Video).title
     : (item.data as Photo).filename

@@ -1,0 +1,763 @@
+   290→          <div className="flex items-center justify-between h-16">
+   291→            <h1 className="text-xl font-bold tracking-tight">Album Koleksi</h1>
+   292→            {view === 'albums' ? (
+   293→              <Button onClick={() => setCreateDialogOpen(true)} size="sm">
+   294→                <Plus className="h-4 w-4 mr-1.5" /> Buat Album
+   295→              </Button>
+   296→            ) : (
+   297→              <div className="flex gap-2">
+   298→                <Button variant="outline" size="sm" onClick={() => setVideoDialogOpen(true)}>
+   299→                  <Video className="h-4 w-4 mr-1.5" /> Tambah Video
+   300→                </Button>
+   301→                <Button size="sm" onClick={() => setUploadDialogOpen(true)}>
+   302→                  <Upload className="h-4 w-4 mr-1.5" /> Upload Foto
+   303→                </Button>
+   304→              </div>
+   305→            )}
+   306→          </div>
+   307→
+   308→          {/* SEARCH + FILTER BAR (only on albums view) */}
+   309→          {view === 'albums' && (
+   310→            <div className="flex flex-col sm:flex-row gap-3 pb-3">
+   311→              <div className="relative flex-1">
+   312→                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+   313→                <Input
+   314→                  placeholder="Cari album..."
+   315→                  value={searchQuery}
+   316→                  onChange={(e) => setSearch(e.target.value)}
+   317→                  className="pl-9"
+   318→                />
+   319→              </div>
+   320→              <Select value={searchCategory} onValueChange={(v) => setFilterCategory(v === '__all__' ? '' : v)}>
+   321→                <SelectTrigger className="w-full sm:w-48">
+   322→                  <SelectValue placeholder="Semua Kategori" />
+   323→                </SelectTrigger>
+   324→                <SelectContent>
+   325→                  <SelectItem value="__all__">Semua Kategori</SelectItem>
+   326→                  {categories.map((cat) => (
+   327→                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+   328→                  ))}
+   329→                </SelectContent>
+   330→              </Select>
+   331→            </div>
+   332→          )}
+   333→        </div>
+   334→      </header>
+   335→
+   336→      {/* MAIN */}
+   337→      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
+   338→        <AnimatePresence mode="wait">
+   339→          {view === 'albums' ? (
+   340→            <motion.div
+   341→              key="albums"
+   342→              variants={pageVariants}
+   343→              initial="initial"
+   344→              animate="animate"
+   345→              exit="exit"
+   346→            >
+   347→              {loading && albums.length === 0 ? (
+   348→                <div className="flex items-center justify-center py-20">
+   349→                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+   350→                </div>
+   351→              ) : albums.length === 0 ? (
+   352→                <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+   353→                  <FolderOpen className="h-16 w-16 mb-4 opacity-40" />
+   354→                  <p className="text-lg font-medium">Belum ada album</p>
+   355→                  <p className="text-sm mt-1">Klik &quot;Buat Album&quot; untuk memulai</p>
+   356→                </div>
+   357→              ) : (
+   358→                <motion.div
+   359→                  className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6"
+   360→                  variants={staggerContainer}
+   361→                  initial="initial"
+   362→                  animate="animate"
+   363→                >
+   364→                  {albums.map((album) => (
+   365→                    <AlbumCard
+   366→                      key={album.id}
+   367→                      album={album}
+   368→                      onClick={() => handleOpenAlbum(album)}
+   369→                      onEdit={() => handleEditAlbum(album)}
+   370→                      onDelete={() => handleDeleteAlbum(album)}
+   371→                    />
+   372→                  ))}
+   373→                </motion.div>
+   374→              )}
+   375→            </motion.div>
+   376→          ) : (
+   377→            <motion.div
+   378→              key="items"
+   379→              variants={pageVariants}
+   380→              initial="initial"
+   381→              animate="animate"
+   382→              exit="exit"
+   383→            >
+   384→              {/* Album header */}
+   385→              <div className="flex items-center gap-3 mb-4">
+   386→                <Button variant="ghost" size="icon" onClick={handleBack}>
+   387→                  <ArrowLeft className="h-5 w-5" />
+   388→                </Button>
+   389→                <div className="flex-1 min-w-0">
+   390→                  <h2 className="text-xl font-bold truncate">{selectedAlbum?.name}</h2>
+   391→                  <p className="text-sm text-muted-foreground">
+   392→                    {selectedAlbum?._count.total ?? 0} item
+   393→                    {selectedAlbum?.category && (
+   394→                      <Badge variant="secondary" className="ml-2 text-xs">
+   395→                        <Tag className="h-3 w-3 mr-1" />{selectedAlbum.category}
+   396→                      </Badge>
+   397→                    )}
+   398→                  </p>
+   399→                </div>
+   400→              </div>
+   401→
+   402→              {/* View mode toolbar */}
+   403→              <div className="flex items-center gap-1.5 mb-5 p-1 bg-muted rounded-lg w-fit">
+   404→                <TooltipButton
+   405→                  icon={<LayoutGrid className="h-4 w-4" />}
+   406→                  label="Grid"
+   407→                  active={viewMode === 'grid'}
+   408→                  onClick={() => setViewMode('grid')}
+   409→                />
+   410→                <TooltipButton
+   411→                  icon={<Rows3 className="h-4 w-4" />}
+   412→                  label="Scroll"
+   413→                  active={viewMode === 'list'}
+   414→                  onClick={() => setViewMode('list')}
+   415→                />
+   416→                <TooltipButton
+   417→                  icon={<ArrowRightLeft className="h-4 w-4" />}
+   418→                  label="Horizontal"
+   419→                  active={viewMode === 'horizontal'}
+   420→                  onClick={() => setViewMode('horizontal')}
+   421→                />
+   422→                {viewMode === 'grid' && (
+   423→                  <div className="w-px h-6 bg-border mx-1" />
+   424→                )}
+   425→                {viewMode === 'grid' && (
+   426→                  <Select value={String(gridCols)} onValueChange={(v) => setGridCols(Number(v))}>
+   427→                    <SelectTrigger className="h-8 w-auto min-w-[60px] border-0 bg-transparent shadow-none focus:ring-0 px-2">
+   428→                      <SelectValue />
+   429→                    </SelectTrigger>
+   430→                    <SelectContent>
+   431→                      <SelectItem value="4">4 Kolom</SelectItem>
+   432→                      <SelectItem value="5">5 Kolom</SelectItem>
+   433→                      <SelectItem value="6">6 Kolom</SelectItem>
+   434→                    </SelectContent>
+   435→                  </Select>
+   436→                )}
+   437→              </div>
+   438→
+   439→              {loading && mediaItems.length === 0 ? (
+   440→                <div className="flex items-center justify-center py-20">
+   441→                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+   442→                </div>
+   443→              ) : mediaItems.length === 0 ? (
+   444→                <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+   445→                  <ImageIcon className="h-16 w-16 mb-4 opacity-40" />
+   446→                  <p className="text-lg font-medium">Belum ada konten</p>
+   447→                  <p className="text-sm mt-1">Upload foto atau tambahkan video</p>
+   448→                </div>
+   449→              ) : viewMode === 'horizontal' ? (
+   450→                /* ============ HORIZONTAL SCROLL ============ */
+   451→                <div className="relative -mx-4 sm:-mx-6 lg:-mx-8">
+   452→                  <div className="flex gap-4 overflow-x-auto px-4 sm:px-6 lg:px-8 pb-4 snap-x snap-mandatory scrollbar-hide">
+   453→                    {mediaItems.map((item, index) => (
+   454→                      <motion.div
+   455→                        key={item.type === 'photo' ? item.data.id : item.data.id}
+   456→                        variants={cardVariants}
+   457→                        className="snap-start shrink-0 w-[280px] sm:w-[320px]"
+   458→                      >
+   459→                        <MediaCard
+   460→                          item={item}
+   461→                          index={index}
+   462→                          onClick={() => openLightbox(mediaItems, index)}
+   463→                          onDelete={() => {
+   464→                            if (item.type === 'photo') deletePhoto(item.data.id)
+   465→                            else deleteVideo(item.data.id)
+   466→                          }}
+   467→                          className="aspect-[4/3]"
+   468→                        />
+   469→                      </motion.div>
+   470→                    ))}
+   471→                  </div>
+   472→                </div>
+   473→              ) : viewMode === 'list' ? (
+   474→                /* ============ LIST / VERTICAL SCROLL ============ */
+   475→                <motion.div
+   476→                  className="flex flex-col gap-4"
+   477→                  variants={staggerContainer}
+   478→                  initial="initial"
+   479→                  animate="animate"
+   480→                >
+   481→                  {mediaItems.map((item, index) => (
+   482→                    <motion.div
+   483→                      key={item.type === 'photo' ? item.data.id : item.data.id}
+   484→                      variants={cardVariants}
+   485→                      className="relative group cursor-pointer rounded-xl overflow-hidden"
+   486→                      onClick={() => openLightbox(mediaItems, index)}
+   487→                    >
+   488→                      {item.type === 'video' ? (
+   489→                        <div className="relative w-full aspect-video bg-muted">
+   490→                          {(item.data as Video).thumbnailUrl ? (
+   491→                            <img
+   492→                              src={(item.data as Video).thumbnailUrl!}
+   493→                              alt={(item.data as Video).title}
+   494→                              className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
+   495→                            />
+   496→                          ) : (
+   497→                            <div className="w-full h-full flex items-center justify-center">
+   498→                              <Video className="h-12 w-12 text-muted-foreground/30" />
+   499→                            </div>
+   500→                          )}
+   501→                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+   502→                            <div className="bg-black/50 rounded-full p-3">
+   503→                              <Play className="h-7 w-7 text-white fill-white" />
+   504→                            </div>
+   505→                          </div>
+   506→                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+   507→                          <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/60 to-transparent">
+   508→                            <p className="text-white text-sm font-medium truncate">{(item.data as Video).title}</p>
+   509→                            <p className="text-white/70 text-xs">{formatDate((item.data as Video).createdAt)}</p>
+   510→                          </div>
+   511→                          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+   512→                            <Button
+   513→                              variant="destructive" size="icon" className="h-8 w-8 rounded-full shadow-lg"
+   514→                              onClick={(e) => { e.stopPropagation(); deleteVideo((item.data as Video).id) }}
+   515→                            >
+   516→                              <Trash2 className="h-3.5 w-3.5" />
+   517→                            </Button>
+   518→                          </div>
+   519→                        </div>
+   520→                      ) : (
+   521→                        <div className="relative w-full bg-muted">
+   522→                          <img
+   523→                            src={(item.data as Photo).thumbnailUrl || (item.data as Photo).url}
+   524→                            alt={(item.data as Photo).filename}
+   525→                            className="w-full max-h-[70vh] object-contain group-hover:scale-[1.01] transition-transform duration-300"
+   526→                          />
+   527→                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+   528→                          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+   529→                            <Button
+   530→                              variant="destructive" size="icon" className="h-8 w-8 rounded-full shadow-lg"
+   531→                              onClick={(e) => { e.stopPropagation(); deletePhoto((item.data as Photo).id) }}
+   532→                            >
+   533→                              <Trash2 className="h-3.5 w-3.5" />
+   534→                            </Button>
+   535→                          </div>
+   536→                        </div>
+   537→                      )}
+   538→                    </motion.div>
+   539→                  ))}
+   540→                </motion.div>
+   541→              ) : (
+   542→                /* ============ GRID VIEW ============ */
+   543→                <motion.div
+   544→                  className={`grid grid-cols-2 sm:grid-cols-3 ${gridCols === 5 ? 'lg:grid-cols-5' : gridCols === 6 ? 'lg:grid-cols-6' : 'lg:grid-cols-4'} gap-4 sm:gap-4`}
+   545→                  variants={staggerContainer}
+   546→                  initial="initial"
+   547→                  animate="animate"
+   548→                >
+   549→                  {mediaItems.map((item, index) => (
+   550→                    <MediaCard
+   551→                      key={item.type === 'photo' ? item.data.id : item.data.id}
+   552→                      item={item}
+   553→                      index={index}
+   554→                      onClick={() => openLightbox(mediaItems, index)}
+   555→                      onDelete={() => {
+   556→                        if (item.type === 'photo') deletePhoto(item.data.id)
+   557→                        else deleteVideo(item.data.id)
+   558→                      }}
+   559→                    />
+   560→                  ))}
+   561→                </motion.div>
+   562→              )}
+   563→            </motion.div>
+   564→          )}
+   565→        </AnimatePresence>
+   566→      </main>
+   567→
+   568→      {/* FOOTER */}
+   569→      <footer className="border-t py-4 mt-auto">
+   570→        <p className="text-center text-xs text-muted-foreground">
+   571→          Album Koleksi &mdash; Next.js + Prisma + ImgBB
+   572→        </p>
+   573→      </footer>
+   574→
+   575→      {/* ====== DIALOGS ====== */}
+   576→
+   577→      {/* Create Album */}
+   578→      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+   579→        <DialogContent>
+   580→          <DialogHeader>
+   581→            <DialogTitle>Buat Album Baru</DialogTitle>
+   582→            <DialogDescription>Isi detail album yang ingin dibuat</DialogDescription>
+   583→          </DialogHeader>
+   584→          <div className="space-y-4 py-2">
+   585→            <div>
+   586→              <Label htmlFor="create-name">Nama Album *</Label>
+   587→              <Input
+   588→                id="create-name"
+   589→                value={newAlbumName}
+   590→                onChange={(e) => setNewAlbumName(e.target.value)}
+   591→                placeholder="Contoh: Liburan Bali 2025"
+   592→              />
+   593→            </div>
+   594→            <div>
+   595→              <Label htmlFor="create-category">Kategori</Label>
+   596→              <Input
+   597→                id="create-category"
+   598→                value={newAlbumCategory}
+   599→                onChange={(e) => setNewAlbumCategory(e.target.value)}
+   600→                placeholder="Contoh: Pribadi, Proyek, Event"
+   601→                list="category-suggestions"
+   602→              />
+   603→              <datalist id="category-suggestions">
+   604→                {categories.map((c) => (
+   605→                  <option key={c} value={c} />
+   606→                ))}
+   607→              </datalist>
+   608→            </div>
+   609→            <div>
+   610→              <Label htmlFor="create-desc">Deskripsi</Label>
+   611→              <Textarea
+   612→                id="create-desc"
+   613→                value={newAlbumDesc}
+   614→                onChange={(e) => setNewAlbumDesc(e.target.value)}
+   615→                placeholder="Opsional"
+   616→                rows={3}
+   617→              />
+   618→            </div>
+   619→          </div>
+   620→          <DialogFooter>
+   621→            <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>Batal</Button>
+   622→            <Button onClick={handleCreateAlbum} disabled={!newAlbumName.trim()}>Buat</Button>
+   623→          </DialogFooter>
+   624→        </DialogContent>
+   625→      </Dialog>
+   626→
+   627→      {/* Edit Album */}
+   628→      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+   629→        <DialogContent>
+   630→          <DialogHeader>
+   631→            <DialogTitle>Edit Album</DialogTitle>
+   632→            <DialogDescription>Ubah detail album</DialogDescription>
+   633→          </DialogHeader>
+   634→          <div className="space-y-4 py-2">
+   635→            <div>
+   636→              <Label htmlFor="edit-name">Nama Album *</Label>
+   637→              <Input
+   638→                id="edit-name"
+   639→                value={editAlbumName}
+   640→                onChange={(e) => setEditAlbumName(e.target.value)}
+   641→              />
+   642→            </div>
+   643→            <div>
+   644→              <Label htmlFor="edit-category">Kategori</Label>
+   645→              <Input
+   646→                id="edit-category"
+   647→                value={editAlbumCategory}
+   648→                onChange={(e) => setEditAlbumCategory(e.target.value)}
+   649→                list="category-suggestions-edit"
+   650→              />
+   651→              <datalist id="category-suggestions-edit">
+   652→                {categories.map((c) => (
+   653→                  <option key={c} value={c} />
+   654→                ))}
+   655→              </datalist>
+   656→            </div>
+   657→            <div>
+   658→              <Label htmlFor="edit-desc">Deskripsi</Label>
+   659→              <Textarea
+   660→                id="edit-desc"
+   661→                value={editAlbumDesc}
+   662→                onChange={(e) => setEditAlbumDesc(e.target.value)}
+   663→                rows={3}
+   664→              />
+   665→            </div>
+   666→          </div>
+   667→          <DialogFooter>
+   668→            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>Batal</Button>
+   669→            <Button onClick={handleSaveEdit} disabled={!editAlbumName.trim()}>Simpan</Button>
+   670→          </DialogFooter>
+   671→        </DialogContent>
+   672→      </Dialog>
+   673→
+   674→      {/* Upload Photos (ImgBB only) */}
+   675→      <Dialog open={uploadDialogOpen} onOpenChange={(open) => {
+   676→        if (!open) handleClearFiles()
+   677→        setUploadDialogOpen(open)
+   678→      }}>
+   679→        <DialogContent className="max-w-lg">
+   680→          <DialogHeader>
+   681→            <DialogTitle>Upload Foto via ImgBB</DialogTitle>
+   682→            <DialogDescription>
+   683→              Foto akan diupload ke ImgBB. Pastikan API key sudah terisi.
+   684→            </DialogDescription>
+   685→          </DialogHeader>
+   686→          <div className="space-y-4 py-2">
+   687→            {/* API Key */}
+   688→            <div>
+   689→              <Label htmlFor="imgbb-key">ImgBB API Key *</Label>
+   690→              <div className="relative mt-1">
+   691→                <Input
+   692→                  id="imgbb-key"
+   693→                  type={showApiKey ? 'text' : 'password'}
+   694→                  value={imgbbApiKey}
+   695→                  onChange={(e) => setImgbbApiKey(e.target.value)}
+   696→                  placeholder="Masukkan API key ImgBB"
+   697→                />
+   698→                <Button
+   699→                  type="button"
+   700→                  variant="ghost"
+   701→                  size="icon"
+   702→                  className="absolute right-0 top-0 h-full px-3"
+   703→                  onClick={() => setShowApiKey(!showApiKey)}
+   704→                >
+   705→                  {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+   706→                </Button>
+   707→              </div>
+   708→              <p className="text-xs text-muted-foreground mt-1">
+   709→                Daftar gratis di{' '}
+   710→                <a href="https://api.imgbb.com/" target="_blank" rel="noreferrer" className="underline">
+   711→                  api.imgbb.com
+   712→                </a>
+   713→              </p>
+   714→            </div>
+   715→
+   716→            {/* Drop Zone */}
+   717→            <div>
+   718→              <Label>Pilih Foto</Label>
+   719→              <div
+   720→                className={`mt-1 border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${isDragOver ? 'border-emerald-500 bg-emerald-50' : 'border-muted-foreground/25 hover:border-muted-foreground/50'}`}
+   721→                onClick={() => fileInputRef.current?.click()}
+   722→                onDragOver={(e) => { e.preventDefault(); setIsDragOver(true) }}
+   723→                onDragLeave={() => setIsDragOver(false)}
+   724→                onDrop={(e) => { e.preventDefault(); setIsDragOver(false); handleFiles(e.dataTransfer.files) }}
+   725→              >
+   726→                <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+   727→                <p className="text-sm text-muted-foreground">
+   728→                  Drag & drop foto ke sini, atau <span className="text-emerald-600 font-medium">klik untuk pilih</span>
+   729→                </p>
+   730→                <p className="text-xs text-muted-foreground mt-1">PNG, JPG, GIF, WEBP</p>
+   731→              </div>
+   732→              <input
+   733→                ref={fileInputRef}
+   734→                type="file"
+   735→                multiple
+   736→                accept="image/*"
+   737→                className="hidden"
+   738→                onChange={(e) => handleFiles(e.target.files)}
+   739→              />
+   740→            </div>
+   741→
+   742→            {/* Previews */}
+   743→            {previews.length > 0 && (
+   744→              <div>
+   745→                <div className="flex items-center justify-between mb-2">
+   746→                  <Label>{selectedFiles.length} file dipilih</Label>
+   747→                  <Button variant="ghost" size="sm" onClick={handleClearFiles}>
+   748→                    <X className="h-3.5 w-3.5 mr-1" /> Hapus Semua
+   749→                  </Button>
+   750→                </div>
+   751→                <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto">
+   752→                  {previews.map((src, i) => (
+   753→                    <div key={i} className="relative aspect-square rounded-md overflow-hidden group">
+   754→                      <img src={src} alt="" className="w-full h-full object-cover" />
+   755→                      <button
+   756→                        onClick={(e) => { e.stopPropagation(); handleRemoveFile(i) }}
+   757→                        className="absolute top-0.5 right-0.5 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+   758→                      >
+   759→                        <X className="h-3 w-3" />
+   760→                      </button>
+   761→                    </div>
+   762→                  ))}
+   763→                </div>
+   764→              </div>
+   765→            )}
+   766→
+   767→            {/* Progress */}
+   768→            {uploading && (
+   769→              <div className="space-y-1">
+   770→                <p className="text-sm text-muted-foreground">Mengunggah...</p>
+   771→                <Progress value={uploadProgress} className="h-2" />
+   772→              </div>
+   773→            )}
+   774→          </div>
+   775→          <DialogFooter>
+   776→            <Button variant="outline" onClick={() => { handleClearFiles(); setUploadDialogOpen(false) }}>Batal</Button>
+   777→            <Button
+   778→              onClick={handleUpload}
+   779→              disabled={uploading || selectedFiles.length === 0 || !imgbbApiKey.trim()}
+   780→            >
+   781→              {uploading && <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />}
+   782→              Upload {selectedFiles.length > 0 ? `(${selectedFiles.length})` : ''}
+   783→            </Button>
+   784→          </DialogFooter>
+   785→        </DialogContent>
+   786→      </Dialog>
+   787→
+   788→      {/* Add Video */}
+   789→      <Dialog open={videoDialogOpen} onOpenChange={setVideoDialogOpen}>
+   790→        <DialogContent>
+   791→          <DialogHeader>
+   792→            <DialogTitle>Tambah Video</DialogTitle>
+   793→            <DialogDescription>
+   794→              Paste link YouTube, Vimeo, atau URL embed video lainnya
+   795→            </DialogDescription>
+   796→          </DialogHeader>
+   797→          <div className="space-y-4 py-2">
+   798→            <div>
+   799→              <Label htmlFor="video-title">Judul Video *</Label>
+   800→              <Input
+   801→                id="video-title"
+   802→                value={videoTitle}
+   803→                onChange={(e) => setVideoTitle(e.target.value)}
+   804→                placeholder="Contoh: Behind the scene"
+   805→              />
+   806→            </div>
+   807→            <div>
+   808→              <Label htmlFor="video-url">URL Video *</Label>
+   809→              <Input
+   810→                id="video-url"
+   811→                value={videoUrl}
+   812→                onChange={(e) => setVideoUrl(e.target.value)}
+   813→                placeholder="https://www.youtube.com/watch?v=... atau https://youtu.be/..."
+   814→              />
+   815→              <p className="text-xs text-muted-foreground mt-1">
+   816→                Mendukung YouTube &amp; Vimeo. Link otomatis dikonversi ke embed.
+   817→              </p>
+   818→            </div>
+   819→          </div>
+   820→          <DialogFooter>
+   821→            <Button variant="outline" onClick={() => setVideoDialogOpen(false)}>Batal</Button>
+   822→            <Button onClick={handleAddVideo} disabled={!videoTitle.trim() || !videoUrl.trim()}>
+   823→              Tambah
+   824→            </Button>
+   825→          </DialogFooter>
+   826→        </DialogContent>
+   827→      </Dialog>
+   828→
+   829→      {/* ====== LIGHTBOX ====== */}
+   830→      <AnimatePresence>
+   831→        {lightbox.open && currentLightboxItem && (
+   832→          <motion.div
+   833→            className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
+   834→            initial={{ opacity: 0 }}
+   835→            animate={{ opacity: 1 }}
+   836→            exit={{ opacity: 0 }}
+   837→            onClick={closeLightbox}
+   838→          >
+   839→            {/* Close button */}
+   840→            <button
+   841→              onClick={closeLightbox}
+   842→              className="absolute top-4 right-4 text-white/80 hover:text-white z-10"
+   843→            >
+   844→              <X className="h-8 w-8" />
+   845→            </button>
+   846→
+   847→            {/* Counter */}
+   848→            <div className="absolute top-4 left-4 text-white/70 text-sm">
+   849→              {lightbox.currentIndex + 1} / {lightbox.items.length}
+   850→            </div>
+   851→
+   852→            {/* Prev */}
+   853→            {lightbox.items.length > 1 && (
+   854→              <button
+   855→                onClick={(e) => { e.stopPropagation(); prevItem() }}
+   856→                className="absolute left-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white z-10"
+   857→              >
+   858→                <ChevronLeft className="h-10 w-10" />
+   859→              </button>
+   860→            )}
+   861→
+   862→            {/* Content */}
+   863→            <motion.div
+   864→              key={lightbox.currentIndex}
+   865→              initial={{ opacity: 0, scale: 0.9 }}
+   866→              animate={{ opacity: 1, scale: 1 }}
+   867→              exit={{ opacity: 0, scale: 0.9 }}
+   868→              transition={{ duration: 0.2 }}
+   869→              className="w-full h-full flex items-center justify-center p-12"
+   870→              onClick={(e) => e.stopPropagation()}
+   871→            >
+   872→              {currentLightboxItem.type === 'photo' ? (
+   873→                <img
+   874→                  src={(currentLightboxItem.data as Photo).thumbnailUrl || (currentLightboxItem.data as Photo).url}
+   875→                  alt=""
+   876→                  className="max-w-full max-h-full object-contain rounded-lg"
+   877→                />
+   878→              ) : (
+   879→                <div className="w-full max-w-4xl aspect-video">
+   880→                  <iframe
+   881→                    src={(currentLightboxItem.data as Video).url}
+   882→                    title={(currentLightboxItem.data as Video).title}
+   883→                    className="w-full h-full rounded-lg"
+   884→                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+   885→                    allowFullScreen
+   886→                  />
+   887→                </div>
+   888→              )}
+   889→            </motion.div>
+   890→
+   891→            {/* Next */}
+   892→            {lightbox.items.length > 1 && (
+   893→              <button
+   894→                onClick={(e) => { e.stopPropagation(); nextItem() }}
+   895→                className="absolute right-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white z-10"
+   896→              >
+   897→                <ChevronRight className="h-10 w-10" />
+   898→              </button>
+   899→            )}
+   900→          </motion.div>
+   901→        )}
+   902→      </AnimatePresence>
+   903→    </div>
+   904→  )
+   905→}
+   906→
+   907→// ==================== SUB-COMPONENTS ====================
+   908→
+   909→function AlbumCard({ album, onClick, onEdit, onDelete }: {
+   910→  album: Album
+   911→  onClick: () => void
+   912→  onEdit: () => void
+   913→  onDelete: () => void
+   914→}) {
+   915→  return (
+   916→    <motion.div variants={cardVariants} layout>
+   917→      <Card
+   918→        className="group cursor-pointer overflow-hidden hover:shadow-lg transition-shadow"
+   919→        onClick={onClick}
+   920→      >
+   921→        <div className="relative aspect-[4/3] overflow-hidden bg-muted">
+   922→          {album.coverUrl ? (
+   923→            <img
+   924→              src={album.coverUrl}
+   925→              alt={album.name}
+   926→              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+   927→            />
+   928→          ) : (
+   929→            <div className="w-full h-full flex items-center justify-center">
+   930→              <ImageIcon className="h-12 w-12 text-muted-foreground/30" />
+   931→            </div>
+   932→          )}
+   933→          {/* Actions overlay */}
+   934→          <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+   935→            <Button
+   936→              variant="secondary" size="icon" className="h-8 w-8 rounded-full shadow"
+   937→              onClick={(e) => { e.stopPropagation(); onEdit() }}
+   938→            >
+   939→              <Pencil className="h-3.5 w-3.5" />
+   940→            </Button>
+   941→            <Button
+   942→              variant="destructive" size="icon" className="h-8 w-8 rounded-full shadow"
+   943→              onClick={(e) => { e.stopPropagation(); onDelete() }}
+   944→            >
+   945→              <Trash2 className="h-3.5 w-3.5" />
+   946→            </Button>
+   947→          </div>
+   948→        </div>
+   949→        <CardContent className="p-3 sm:p-4">
+   950→          <h3 className="font-semibold text-sm sm:text-base truncate">{album.name}</h3>
+   951→          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+   952→            {album.category && (
+   953→              <Badge variant="secondary" className="text-xs gap-1">
+   954→                <Tag className="h-3 w-3" />{album.category}
+   955→              </Badge>
+   956→            )}
+   957→            <span className="text-xs text-muted-foreground">
+   958→              {album._count.total} item
+   959→            </span>
+   960→            <span className="text-xs text-muted-foreground">
+   961→              {formatDate(album.createdAt)}
+   962→            </span>
+   963→          </div>
+   964→        </CardContent>
+   965→      </Card>
+   966→    </motion.div>
+   967→  )
+   968→}
+   969→
+   970→function TooltipButton({ icon, label, active, onClick }: {
+   971→  icon: React.ReactNode
+   972→  label: string
+   973→  active: boolean
+   974→  onClick: () => void
+   975→}) {
+   976→  return (
+   977→    <button
+   978→      onClick={onClick}
+   979→      title={label}
+   980→      className={`flex items-center justify-center h-8 px-2.5 rounded-md text-sm font-medium transition-colors ${
+   981→        active
+   982→          ? 'bg-background shadow-sm text-foreground'
+   983→          : 'text-muted-foreground hover:text-foreground'
+   984→      }`}
+   985→    >
+   986→      {icon}
+   987→    </button>
+   988→  )
+   989→}
+   990→
+   991→function MediaCard({ item, index, onClick, onDelete, className }: {
+   992→  item: MediaItem
+   993→  index: number
+   994→  onClick: () => void
+   995→  onDelete: () => void
+   996→  className?: string
+   997→}) {
+   998→  const isVideo = item.type === 'video'
+   999→  const src = isVideo
+  1000→    ? (item.data as Video).thumbnailUrl || ''
+  1001→    : (item.data as Photo).thumbnailUrl || (item.data as Photo).url
+  1002→  const title = isVideo
+  1003→    ? (item.data as Video).title
+  1004→    : (item.data as Photo).filename
+  1005→
+  1006→  return (
+  1007→    <motion.div
+  1008→      variants={cardVariants}
+  1009→      layout
+  1010→      className={`relative ${className || 'aspect-square'} rounded-xl overflow-hidden group cursor-pointer`}
+  1011→      onClick={onClick}
+  1012→    >
+  1013→      {src ? (
+  1014→        <img
+  1015→          src={src}
+  1016→          alt={title}
+  1017→          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+  1018→        />
+  1019→      ) : (
+  1020→        <div className="w-full h-full bg-muted flex items-center justify-center">
+  1021→          {isVideo ? (
+  1022→            <Video className="h-10 w-10 text-muted-foreground/40" />
+  1023→          ) : (
+  1024→            <ImageIcon className="h-10 w-10 text-muted-foreground/40" />
+  1025→          )}
+  1026→        </div>
+  1027→      )}
+  1028→
+  1029→      {/* Video play icon */}
+  1030→      {isVideo && (
+  1031→        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+  1032→          <div className="bg-black/50 rounded-full p-3">
+  1033→            <Play className="h-8 w-8 text-white fill-white" />
+  1034→          </div>
+  1035→        </div>
+  1036→      )}
+  1037→
+  1038→      {/* Delete overlay */}
+  1039→      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors">
+  1040→        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+  1041→          <Button
+  1042→            variant="destructive" size="icon" className="h-8 w-8 rounded-full shadow-lg"
+  1043→            onClick={(e) => { e.stopPropagation(); onDelete() }}
+  1044→          >
+  1045→            <Trash2 className="h-3.5 w-3.5" />
+  1046→          </Button>
+  1047→        </div>
+  1048→      </div>
+  1049→    </motion.div>
+  1050→  )
+  1051→}
+  1052→
