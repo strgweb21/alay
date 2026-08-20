@@ -278,54 +278,90 @@ export const useAlbumStore = create<AlbumStore>((set, get) => ({
   },
 
   uploadPhotos: async (albumId, files, apiKey) => {
+    if (!apiKey || files.length === 0) return false
+
     set({ uploading: true, uploadProgress: 0 })
-    try {
-      const formData = new FormData()
-      for (const file of files) {
-        formData.append('files', file)
-      }
-      formData.append('apiKey', apiKey)
+    const results: { filename: string; url: string; thumbnailUrl: string | null; size: number }[] = []
+    const total = files.length
+    let failedCount = 0
 
-      let progress = 0
-      const interval = setInterval(() => {
-        progress = Math.min(progress + Math.random() * 15, 90)
-        set({ uploadProgress: progress })
-      }, 300)
+    for (let i = 0; i < total; i++) {
+      const file = files[i]
+      try {
+        // Convert file to base64 directly in browser
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => {
+            const result = reader.result as string
+            // Strip data URL prefix, keep only base64
+            const commaIndex = result.indexOf(',')
+            resolve(commaIndex >= 0 ? result.substring(commaIndex + 1) : result)
+          }
+          reader.onerror = () => reject(new Error('Failed to read file'))
+          reader.readAsDataURL(file)
+        })
 
-      const res = await fetch(`/api/albums/${albumId}/photos/imgbb`, {
-        method: 'POST',
-        body: formData,
-      })
-      clearInterval(interval)
-      set({ uploadProgress: 100 })
+        // Upload DIRECTLY to ImgBB from browser (no Vercel middleman)
+        const imgbbForm = new FormData()
+        imgbbForm.append('key', apiKey)
+        imgbbForm.append('image', base64)
 
-      const json = await res.json()
-      if (json.success) {
-        const uploadedCount = json.data?.photos?.length ?? json.data?.length ?? 0
-        const partialErrors = json.data?.errors
-        if (partialErrors && partialErrors.length > 0) {
-          toast({
-            title: `${uploadedCount} foto berhasil`,
-            description: `${partialErrors.length} gagal. Cek konsol untuk detail.`,
-            variant: 'destructive',
+        const imgbbRes = await fetch('https://api.imgbb.com/1/upload', {
+          method: 'POST',
+          body: imgbbForm,
+        })
+
+        const imgbbResult = await imgbbRes.json()
+
+        if (imgbbResult.success && imgbbResult.data) {
+          results.push({
+            filename: file.name,
+            url: imgbbResult.data.image?.url || imgbbResult.data.display_url || imgbbResult.data.url,
+            thumbnailUrl: imgbbResult.data.thumb?.url || null,
+            size: file.size,
           })
-          console.warn('Partial upload errors:', partialErrors)
         } else {
-          toast({ title: 'Berhasil', description: `${uploadedCount} foto berhasil diunggah` })
+          console.error(`ImgBB upload failed for ${file.name}:`, imgbbResult.error?.message || imgbbResult)
+          failedCount++
         }
-        await get().fetchPhotos(albumId)
-        await get().fetchAlbums()
-        return true
-      } else {
-        toast({ title: 'Gagal mengunggah', description: json.error, variant: 'destructive' })
-        return false
+      } catch (err) {
+        console.error(`Failed to upload ${file.name}:`, err)
+        failedCount++
       }
-    } catch {
-      toast({ title: 'Error', description: 'Gagal terhubung ke server', variant: 'destructive' })
-      return false
-    } finally {
-      set({ uploading: false, uploadProgress: 0 })
+
+      set({ uploadProgress: Math.round(((i + 1) / total) * 100) })
     }
+
+    // Send URLs to our API to save to database (tiny payload, no files)
+    if (results.length > 0) {
+      try {
+        const saveRes = await fetch(`/api/albums/${albumId}/photos`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ photos: results }),
+        })
+        const saveJson = await saveRes.json()
+        if (!saveJson.success) {
+          toast({ title: 'Gagal menyimpan', description: saveJson.error || 'Foto diupload ke ImgBB tapi gagal disimpan', variant: 'destructive' })
+        }
+      } catch {
+        toast({ title: 'Gagal menyimpan', description: 'Foto diupload ke ImgBB tapi gagal tersimpan ke database', variant: 'destructive' })
+      }
+    }
+
+    // Feedback
+    if (results.length > 0 && failedCount === 0) {
+      toast({ title: 'Berhasil', description: `${results.length} foto diunggah` })
+    } else if (results.length > 0) {
+      toast({ title: `${results.length} berhasil, ${failedCount} gagal`, description: 'Beberapa foto gagal diunggah', variant: 'destructive' })
+    } else {
+      toast({ title: 'Gagal mengunggah', description: 'Semua foto gagal. Cek API key dan koneksi.', variant: 'destructive' })
+    }
+
+    await get().fetchPhotos(albumId)
+    await get().fetchAlbums()
+    set({ uploading: false, uploadProgress: 0 })
+    return results.length > 0
   },
 
   deletePhoto: async (id) => {

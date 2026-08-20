@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
 
     const where: Record<string, unknown> = {}
     if (search) {
-      where.name = { contains: search }
+      where.name = { contains: search, mode: 'insensitive' }
     }
     if (category) {
       where.category = category
