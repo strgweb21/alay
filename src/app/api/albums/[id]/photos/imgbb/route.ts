@@ -61,10 +61,11 @@ export async function POST(
           continue
         }
 
-        const displayUrl = result.data?.display_url
+        // image.url = original full-quality, display_url = potentially compressed
+        const imageUrl = result.data?.image?.url || result.data?.url || result.data?.display_url
         const thumbUrl = result.data?.thumb?.url || null
 
-        if (!displayUrl) {
+        if (!imageUrl) {
           errors.push(`Failed to upload ${file.name}: No URL returned from ImgBB`)
           continue
         }
@@ -73,7 +74,7 @@ export async function POST(
           data: {
             albumId: id,
             filename: file.name,
-            url: displayUrl,
+            url: imageUrl,
             thumbnailUrl: thumbUrl,
             source: 'imgbb',
             size: file.size,
@@ -85,7 +86,7 @@ export async function POST(
         if (needsCoverUpdate) {
           await db.album.update({
             where: { id },
-            data: { coverUrl: displayUrl },
+            data: { coverUrl: imageUrl },
           })
           needsCoverUpdate = false
         }
