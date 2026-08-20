@@ -20,6 +20,10 @@ import {
   Tag,
   Eye,
   EyeOff,
+  LayoutGrid,
+  Rows3,
+  ArrowRightLeft,
+  ChevronDown,
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -125,6 +129,11 @@ export default function Home() {
   const [editAlbumDesc, setEditAlbumDesc] = useState('')
   const [editAlbumCategory, setEditAlbumCategory] = useState('')
   const [editingAlbum, setEditingAlbum] = useState<Album | null>(null)
+
+  // View mode
+  type ViewMode = 'grid' | 'list' | 'horizontal'
+  const [viewMode, setViewMode] = useState<ViewMode>('grid')
+  const [gridCols, setGridCols] = useState(4)
 
   // Upload states
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
@@ -373,7 +382,7 @@ export default function Home() {
               exit="exit"
             >
               {/* Album header */}
-              <div className="flex items-center gap-3 mb-6">
+              <div className="flex items-center gap-3 mb-4">
                 <Button variant="ghost" size="icon" onClick={handleBack}>
                   <ArrowLeft className="h-5 w-5" />
                 </Button>
@@ -390,6 +399,43 @@ export default function Home() {
                 </div>
               </div>
 
+              {/* View mode toolbar */}
+              <div className="flex items-center gap-1.5 mb-5 p-1 bg-muted rounded-lg w-fit">
+                <TooltipButton
+                  icon={<LayoutGrid className="h-4 w-4" />}
+                  label="Grid"
+                  active={viewMode === 'grid'}
+                  onClick={() => setViewMode('grid')}
+                />
+                <TooltipButton
+                  icon={<Rows3 className="h-4 w-4" />}
+                  label="Scroll"
+                  active={viewMode === 'list'}
+                  onClick={() => setViewMode('list')}
+                />
+                <TooltipButton
+                  icon={<ArrowRightLeft className="h-4 w-4" />}
+                  label="Horizontal"
+                  active={viewMode === 'horizontal'}
+                  onClick={() => setViewMode('horizontal')}
+                />
+                {viewMode === 'grid' && (
+                  <div className="w-px h-6 bg-border mx-1" />
+                )}
+                {viewMode === 'grid' && (
+                  <Select value={String(gridCols)} onValueChange={(v) => setGridCols(Number(v))}>
+                    <SelectTrigger className="h-8 w-auto min-w-[60px] border-0 bg-transparent shadow-none focus:ring-0 px-2">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="4">4 Kolom</SelectItem>
+                      <SelectItem value="5">5 Kolom</SelectItem>
+                      <SelectItem value="6">6 Kolom</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+
               {loading && mediaItems.length === 0 ? (
                 <div className="flex items-center justify-center py-20">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -400,9 +446,102 @@ export default function Home() {
                   <p className="text-lg font-medium">Belum ada konten</p>
                   <p className="text-sm mt-1">Upload foto atau tambahkan video</p>
                 </div>
-              ) : (
+              ) : viewMode === 'horizontal' ? (
+                /* ============ HORIZONTAL SCROLL ============ */
+                <div className="relative -mx-4 sm:-mx-6 lg:-mx-8">
+                  <div className="flex gap-4 overflow-x-auto px-4 sm:px-6 lg:px-8 pb-4 snap-x snap-mandatory scrollbar-hide">
+                    {mediaItems.map((item, index) => (
+                      <motion.div
+                        key={item.type === 'photo' ? item.data.id : item.data.id}
+                        variants={cardVariants}
+                        className="snap-start shrink-0 w-[280px] sm:w-[320px]"
+                      >
+                        <MediaCard
+                          item={item}
+                          index={index}
+                          onClick={() => openLightbox(mediaItems, index)}
+                          onDelete={() => {
+                            if (item.type === 'photo') deletePhoto(item.data.id)
+                            else deleteVideo(item.data.id)
+                          }}
+                          className="aspect-[4/3]"
+                        />
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              ) : viewMode === 'list' ? (
+                /* ============ LIST / VERTICAL SCROLL ============ */
                 <motion.div
-                  className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6"
+                  className="flex flex-col gap-4"
+                  variants={staggerContainer}
+                  initial="initial"
+                  animate="animate"
+                >
+                  {mediaItems.map((item, index) => (
+                    <motion.div
+                      key={item.type === 'photo' ? item.data.id : item.data.id}
+                      variants={cardVariants}
+                      className="relative group cursor-pointer rounded-xl overflow-hidden"
+                      onClick={() => openLightbox(mediaItems, index)}
+                    >
+                      {item.type === 'video' ? (
+                        <div className="relative w-full aspect-video bg-muted">
+                          {(item.data as Video).thumbnailUrl ? (
+                            <img
+                              src={(item.data as Video).thumbnailUrl!}
+                              alt={(item.data as Video).title}
+                              className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Video className="h-12 w-12 text-muted-foreground/30" />
+                            </div>
+                          )}
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="bg-black/50 rounded-full p-3">
+                              <Play className="h-7 w-7 text-white fill-white" />
+                            </div>
+                          </div>
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+                          <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/60 to-transparent">
+                            <p className="text-white text-sm font-medium truncate">{(item.data as Video).title}</p>
+                            <p className="text-white/70 text-xs">{formatDate((item.data as Video).createdAt)}</p>
+                          </div>
+                          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              variant="destructive" size="icon" className="h-8 w-8 rounded-full shadow-lg"
+                              onClick={(e) => { e.stopPropagation(); deleteVideo((item.data as Video).id) }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="relative w-full bg-muted">
+                          <img
+                            src={(item.data as Photo).thumbnailUrl || (item.data as Photo).url}
+                            alt={(item.data as Photo).filename}
+                            className="w-full max-h-[70vh] object-contain group-hover:scale-[1.01] transition-transform duration-300"
+                          />
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              variant="destructive" size="icon" className="h-8 w-8 rounded-full shadow-lg"
+                              onClick={(e) => { e.stopPropagation(); deletePhoto((item.data as Photo).id) }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </motion.div>
+                  ))}
+                </motion.div>
+              ) : (
+                /* ============ GRID VIEW ============ */
+                <motion.div
+                  className={`grid grid-cols-2 sm:grid-cols-3 ${gridCols === 5 ? 'lg:grid-cols-5' : gridCols === 6 ? 'lg:grid-cols-6' : 'lg:grid-cols-4'} gap-4 sm:gap-4`}
                   variants={staggerContainer}
                   initial="initial"
                   animate="animate"
@@ -828,11 +967,33 @@ function AlbumCard({ album, onClick, onEdit, onDelete }: {
   )
 }
 
-function MediaCard({ item, index, onClick, onDelete }: {
+function TooltipButton({ icon, label, active, onClick }: {
+  icon: React.ReactNode
+  label: string
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={label}
+      className={`flex items-center justify-center h-8 px-2.5 rounded-md text-sm font-medium transition-colors ${
+        active
+          ? 'bg-background shadow-sm text-foreground'
+          : 'text-muted-foreground hover:text-foreground'
+      }`}
+    >
+      {icon}
+    </button>
+  )
+}
+
+function MediaCard({ item, index, onClick, onDelete, className }: {
   item: MediaItem
   index: number
   onClick: () => void
   onDelete: () => void
+  className?: string
 }) {
   const isVideo = item.type === 'video'
   const src = isVideo
@@ -846,7 +1007,7 @@ function MediaCard({ item, index, onClick, onDelete }: {
     <motion.div
       variants={cardVariants}
       layout
-      className="relative aspect-square rounded-xl overflow-hidden group cursor-pointer"
+      className={`relative ${className || 'aspect-square'} rounded-xl overflow-hidden group cursor-pointer`}
       onClick={onClick}
     >
       {src ? (
