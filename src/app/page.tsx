@@ -460,7 +460,7 @@ export default function Home() {
       {/* FOOTER */}
       <footer className="border-t py-4 mt-auto">
         <p className="text-center text-xs text-muted-foreground">
-          Album Koleksi &mdash; Next.js + Prisma + ImgBB
+          Album Koleksi &mdash; 18+
         </p>
       </footer>
 
@@ -683,7 +683,7 @@ export default function Home() {
           <DialogHeader>
             <DialogTitle>Tambah Video</DialogTitle>
             <DialogDescription>
-              Paste link YouTube, Vimeo, atau URL embed video lainnya
+              Paste link YouTube, Turbovid, atau URL embed video lainnya
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -693,7 +693,7 @@ export default function Home() {
                 id="video-title"
                 value={videoTitle}
                 onChange={(e) => setVideoTitle(e.target.value)}
-                placeholder="Contoh: Behind the scene"
+                placeholder="Contoh: sex scene"
               />
             </div>
             <div>
@@ -704,9 +704,6 @@ export default function Home() {
                 onChange={(e) => setVideoUrl(e.target.value)}
                 placeholder="https://www.youtube.com/watch?v=... atau https://youtu.be/..."
               />
-              <p className="text-xs text-muted-foreground mt-1">
-                Mendukung YouTube &amp; Vimeo. Link otomatis dikonversi ke embed.
-              </p>
             </div>
           </div>
           <DialogFooter>
@@ -937,13 +934,13 @@ function MediaCard({ item, index, onClick, onDelete, className }: {
           <Button
             variant="destructive"
             size="icon"
-            className="h-8 w-8 rounded-full shadow-lg"
+            className="h-8 w-8 rounded-full shadow-lg bg-red-600 hover:bg-red-700 text-white cursor-pointer"
             onClick={(e) => {
               e.stopPropagation()
               onDelete()
             }}
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            <Trash2 className="h-3.5 w-3.5 text-white" />
           </Button>
         </div>
       </div>
