@@ -14,24 +14,33 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Z.ai Code Scaffold - AI-Powered Development",
-  description: "Modern Next.js scaffold optimized for AI-powered development with Z.ai. Built with TypeScript, Tailwind CSS, and shadcn/ui.",
-  keywords: ["Z.ai", "Next.js", "TypeScript", "Tailwind CSS", "shadcn/ui", "AI development", "React"],
-  authors: [{ name: "Z.ai Team" }],
+  title: "Alayer - Album Cosplayer 18+",
+  description: "Platform galeri eksklusif dan album foto cosplayer dewasa (18+). Temukan konten cosplay premium dari berbagai cosplayer favoritmu.",
+  keywords: ["Alayer", "Album Cosplayer 18+", "Cosplay Dewasa", "Galeri Cosplayer", "Cosplay Premium", "Exclusive Cosplay"],
+  authors: [{ name: "Alayer Team" }],
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "/favicon.ico", // Sesuaikan dengan path logo Anda
   },
   openGraph: {
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
-    url: "https://chat.z.ai",
-    siteName: "Z.ai",
+    title: "Alayer - Album Cosplayer 18+",
+    description: "Galeri eksklusif dan album foto cosplay dewasa (18+)",
+    url: "https://alayer.id", // Sesuaikan dengan domain Anda
+    siteName: "Alayer",
     type: "website",
+    images: [
+      {
+        url: "/og-image.jpg", // Gambar preview media sosial
+        width: 1200,
+        height: 630,
+        alt: "Alayer - Album Cosplayer 18+",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
+    title: "Alayer - Album Cosplayer 18+",
+    description: "Galeri eksklusif dan album foto cosplay dewasa (18+)",
+    images: ["/og-image.jpg"],
   },
 };
 
