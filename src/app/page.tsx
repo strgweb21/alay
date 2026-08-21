@@ -931,15 +931,6 @@ function MediaCard({ item, index, onClick, onDelete, className }: {
         </div>
       )}
 
-      {/* Video play icon overlay */}
-      {isVideo && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-          <div className="bg-black/50 rounded-full p-3">
-            <Play className="h-8 w-8 text-white fill-white" />
-          </div>
-        </div>
-      )}
-
       {/* Delete overlay */}
       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors z-20">
         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
