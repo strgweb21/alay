@@ -831,7 +831,7 @@ function AlbumCard({ album, onClick, onEdit, onDelete }: {
               <Pencil className="h-3.5 w-3.5" />
             </Button>
             <Button
-              variant="destructive" size="icon" className="h-8 w-8 rounded-full shadow"
+              variant="destructive" size="icon" className="h-8 w-8 rounded-full shadow-lg bg-red-600 hover:bg-red-700 text-white cursor-pointer"
               onClick={(e) => { e.stopPropagation(); onDelete() }}
             >
               <Trash2 className="h-3.5 w-3.5" />
